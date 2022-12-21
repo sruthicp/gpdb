@@ -19080,6 +19080,11 @@ ComputePartitionAttrs(ParseState *pstate, Relation rel, List *partParams, AttrNu
 						 parser_errposition(pstate, pelem->location)));
 			attform = (Form_pg_attribute) GETSTRUCT(atttuple);
 
+			if (strategy == PARTITION_STRATEGY_HASH && type_is_enum(attform->atttypid))
+				ereport(ERROR,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("cannot use ENUM column \"%s\" in PARTITION BY statement for hash partitions", attform->attname.data)));
+
 			if (attform->attnum <= 0)
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
