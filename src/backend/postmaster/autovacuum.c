@@ -1535,6 +1535,8 @@ int
 StartAutoVacWorker(void)
 {
 	pid_t		worker_pid;
+	char		filepath[50];
+	int		fd;
 
 #ifdef EXEC_BACKEND
 	switch ((worker_pid = avworker_forkexec()))
@@ -1559,6 +1561,8 @@ StartAutoVacWorker(void)
 			break;
 #endif
 		default:
+			sprintf(filepath, "/tmp/ajr/%d", worker_pid);
+			fd = creat(filepath, 0666);
 			return (int) worker_pid;
 	}
 

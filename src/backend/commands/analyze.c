@@ -110,6 +110,7 @@
 #include "utils/guc.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
+#include "utils/palloc.h"
 #include "utils/pg_rusage.h"
 #include "utils/sampling.h"
 #include "utils/sortsupport.h"
@@ -1097,6 +1098,9 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 
 	/* Restore userid and security context */
 	SetUserIdAndSecContext(save_userid, save_sec_context);
+
+	// AJR
+	MemoryContextStats(anl_context);
 
 	/* Restore current context and release memory */
 	MemoryContextSwitchTo(caller_context);
