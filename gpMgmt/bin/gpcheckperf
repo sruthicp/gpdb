@@ -34,6 +34,8 @@ Usage: gpcheckperf <options>
 import datetime
 import os
 import sys
+from gppylib.commands import unix
+from gppylib.commands.base import *
 
 sys.path.append(sys.path[0] + '/lib')
 try:
@@ -121,6 +123,43 @@ def gpscp(src, dst):
     rc = p.wait()
     return not rc, out
 
+
+def gpsync(src, dst):
+
+    hostlist = ssh_utils.HostList()
+    for h in GV.opt['-h']:
+        hostlist.add(h)
+    if GV.opt['-f']:
+        hostlist.parseFile(GV.opt['-f'])
+
+    try:
+        hostlist.checkSSH()
+    except ssh_utils.SSHError, e:
+        sys.exit('[ERROR] ' + str(e))
+
+    GV.opt['-h'] = hostlist.filterMultiHomedHosts()
+    if len(GV.opt['-h']) == 0:
+        usage('Error: missing hosts in -h and/or -f arguments')
+
+    rsync = 'rsync -e "ssh -o BatchMode=yes -o StrictHostKeyChecking=no"'
+    if GV.opt['-r']:  rsync += ' -r'
+
+    for peer in GV.opt['-h']:
+        cmdStr = rsync + ' '
+        cmdStr = cmdStr + src + " "
+        cmdStr = cmdStr + unix.canonicalize(peer) + ":"
+        cmdStr = cmdStr + dst
+        print('rsync error cmdstr', cmdStr)
+    cmd = Command(name='rsync', cmdStr=cmdStr, ctxt=REMOTE, remoteHost=peer)
+    try:
+        cmd.run(validateAfter=True)
+    except Exception as e:
+        print 'rsync error---->: %s' % str(e)
+        return
+
+    results = cmd.get_results()
+    print 'rsync results---->: %s' % results
+    return cmd.get_results().rc,results.stdout.strip().split('\n')
 
 def getPlatform():
     if sys.platform.find('linux') >= 0:
@@ -395,9 +434,21 @@ def copyExecOver(fname):
     if not os.access(path, os.X_OK):
         sys.exit('[Exit] file not executable: ' + path)
 
+    """
     (ok, out) = gpscp(path, '=:%s' % target)
     if not ok:
         sys.exit('[Error] command failed: gpscp %s =:%s with output: %s' % (path, target, out))
+    """
+
+
+    if isScpEnabled:
+        (rc, out) = gpsync(path, '%s' % target)
+        if rc != 0:
+            sys.exit('[Error] command failed: gpsync %s %s with output: %s' % (path, target, out))
+    else:
+        (ok, out) = gpscp(path, '=:%s' % target)
+        if not ok:
+            sys.exit('[Error] command failed: gpscp %s =:%s with output: %s' % (path, target, out))
 
     # chmod +x file
     (ok, out) = gpssh('chmod a+rx %s' % target)
@@ -928,18 +979,39 @@ def printResult(title, result):
     print
 
 
-def main():
+try:
+    parseCommandLine()
+    runSetup()
+    diskWriteResult = diskReadResult = streamResult = netResult = None
+    tornDown = False
+    isScpEnabled = True
     try:
-        parseCommandLine()
-        runSetup()
-        diskWriteResult = diskReadResult = streamResult = netResult = None
-        tornDown = False
-        try:
-            if GV.opt['-r'].find('d') >= 0:
-                print('[Warning] Using %d bytes for disk performance test. This might take some time' % (GV.opt['-S'] * len(GV.opt['-d'])))
-                multidd = copyExecOver('multidd')
-                diskWriteResult = runDiskWriteTest(multidd)
-                diskReadResult = runDiskReadTest(multidd)
+
+        hostlist = ssh_utils.HostList()
+        for h in GV.opt['-h']:
+            hostlist.add(h)
+        if GV.opt['-f']:
+            hostlist.parseFile(GV.opt['-f'])
+
+        #hostlist.add(os.environ.get('PGHOST'))
+
+        GV.opt['-h'] = hostlist.filterMultiHomedHosts()
+        if len(GV.opt['-h']) == 0:
+            usage('Error: missing hosts in -h and/or -f arguments')
+
+        # check if scp executable file is present on the system for multiple host
+        for host in GV.opt['-h']:
+
+            scp_exce_rc = unix.check_scp_executable(host)
+            print 'peer scp_exce_rc  -->: %s' % type(scp_exce_rc)
+            if scp_exce_rc != 0:
+                isScpEnabled = False
+
+        if GV.opt['-r'].find('d') >= 0:
+               print('[Warning] Using %d bytes for disk performance test. This might take some time' % (GV.opt['-S'] * len(GV.opt['-d'])))
+            multidd = copyExecOver('multidd')
+            diskWriteResult = runDiskWriteTest(multidd)
+            diskReadResult = runDiskReadTest(multidd)
 
             if GV.opt['-r'].find('s') >= 0:
                 streamResult = runStreamTest()
