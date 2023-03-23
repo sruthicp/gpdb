@@ -442,13 +442,14 @@ def copyExecOver(fname):
 
 
     if isScpEnabled:
-        (rc, out) = gpsync(path, '%s' % target)
-        if rc != 0:
-            sys.exit('[Error] command failed: gpsync %s %s with output: %s' % (path, target, out))
-    else:
         (ok, out) = gpscp(path, '=:%s' % target)
         if not ok:
             sys.exit('[Error] command failed: gpscp %s =:%s with output: %s' % (path, target, out))
+    else:
+        (rc, out) = gpsync(path, '%s' % target)
+        if rc != 0:
+            sys.exit('[Error] command failed: gpsync %s %s with output: %s' % (path, target, out))
+
 
     # chmod +x file
     (ok, out) = gpssh('chmod a+rx %s' % target)
@@ -1003,7 +1004,7 @@ try:
         for host in GV.opt['-h']:
 
             scp_exce_rc = unix.check_scp_executable(host)
-            print 'peer scp_exce_rc  -->: %s' % type(scp_exce_rc)
+            print 'peer scp_exce_rc  -->: %s' % scp_exce_rc
             if scp_exce_rc != 0:
                 isScpEnabled = False
 

@@ -140,6 +140,7 @@ try:
         cmd = scp + ' '
         for f in GV.filePath:
             cmd += f.replace(GV.opt['-J'], '%s:' % peer) + ' '
+            print '[cmdstr %s] %s' % (cmd, peer)
         proc.append(run(cmd, peer))
 
     errmsg = None
