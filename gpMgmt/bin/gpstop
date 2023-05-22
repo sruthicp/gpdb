@@ -159,7 +159,52 @@ class GpStop:
         """
         Run and return the exitCode for the program
         """
-        self._prepare()
+
+        # setting the retry_count to 2 as we need to run self._prepare() again
+        # after handling database shutting down state.
+        retry_count = 2
+        for _ in range(retry_count):
+            try:
+                self._prepare()
+                break
+            except Exception as exc:
+                if "the database system is shutting down" in str(exc):
+                    logger.warning("The database is currently in the process of shutting down.")
+
+                    if self.sighup:
+                        logger.fatal("Failed to send SIGHUP to postmaster. "
+                                     "Please use 'gpstop' to complete the cluster shutdown.")
+                        sys.exit(1)
+                    logger.info("Complete the shutdown in fast mode or immediate mode.")
+
+                    # Prompt user for mode selection
+                    mode_selection = userinput.ask_string("Your_choice", "['(f)ast_mode', '(i)mmediate_mode']", 'f',
+                                                          ['f', 'i'])
+                    logger.info("Your choice was '{0}'".format(mode_selection))
+
+                    # Set mode based on user selection
+                    self.mode = 'fast' if mode_selection == 'f' else 'immediate'
+
+                    # Kill the postgres processes
+                    logger.info("Removing coordinator processes stuck in shutdown state from previous gpstop.")
+                    cmd = Command('kill postgres processes', cmdStr="pkill postgres")
+                    try:
+                        cmd.run(validateAfter=True)
+                    except Exception as e:
+                        logger.error("Unable to kill postgres processes: {0}".format(str(e)))
+                        return False
+
+                    # Start gpstart in coordinator_only mode to get the segment informations.
+                    logger.info("Running gpstart in coordinator_only mode.")
+                    gpcmd = gp.GpStart("running gpstart -am", coordinatorOnly=True)
+                    try:
+                        gpcmd.run(validateAfter=True)
+                    except Exception as e:
+                        logger.error("Coordinator_only startup failed: {0}".format(str(e)))
+                        return False
+                else:
+                    # If there is any other exception, raise it.
+                    raise
 
         if self.coordinatoronly:
             if self.interactive:
