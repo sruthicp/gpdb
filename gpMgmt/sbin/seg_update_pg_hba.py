@@ -72,6 +72,15 @@ def remove_dup_add_entries(lines, entries):
 
     return out_entries
 
+def remove_stale_replication_entries(lines, entries):
+    if "replication" in entries:
+        entries_set = set(entries.split('\n'))
+        final_entries = [line.strip() for line in lines if
+                         not ("replication" in line and line.strip() not in entries_set)]
+    else:
+        final_entries = lines
+    return final_entries
+
 def run_pg_ctl_reload(datadir):
     name = "pg_ctl reload"
     cmd_str = "$GPHOME/bin/pg_ctl reload -D %s" % datadir
@@ -83,7 +92,8 @@ def main():
     hba_filename = options.datadir +'/pg_hba.conf'
     lines, temp_hba_filename = read_from_hba_file_and_get_empty_tempfile(hba_filename)
     out_entries = remove_dup_add_entries(lines, options.entries)
-    write_entries(out_entries, temp_hba_filename, hba_filename)
+    final_entries = remove_stale_replication_entries(out_entries, options.entries)
+    write_entries(final_entries, temp_hba_filename, hba_filename)
     run_pg_ctl_reload(options.datadir)
 
 if __name__ == "__main__":
