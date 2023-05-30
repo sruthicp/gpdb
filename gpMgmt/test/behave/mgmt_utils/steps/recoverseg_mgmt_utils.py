@@ -10,6 +10,7 @@ from gppylib.gparray import GpArray, ROLE_PRIMARY, ROLE_MIRROR
 from test.behave_utils.utils import *
 import platform, shutil
 from behave import given, when, then
+import socket
 
 #TODO remove duplication of these functions
 def _get_gpAdminLogs_directory():
@@ -624,3 +625,34 @@ def impl(context, expected_additional_entries):
     if actual_backout_entries != expected_total_entries:
         raise Exception("Expected configuration history table to have {} backout entries, found {}".format(
             context.original_config_history_backout_count + expected_additional_entries, actual_backout_entries))
+
+@then('pg_hba file on primary of mirrors on "{newhost}" contains no replication entries for "{oldhost}"')
+@when('pg_hba file on primary of mirrors on "{newhost}" contains no replication entries for "{oldhost}"')
+def impl(context, newhost, oldhost):
+    all_segments = GpArray.initFromCatalog(dbconn.DbURL()).getSegmentList()
+
+    for seg in all_segments:
+        if seg.mirrorDB.getSegmentHostName() != newhost:
+            continue
+        for host in oldhost.split(','):
+            search_hostname, _, search_ip_addr = socket.gethostbyaddr(host)
+            pg_hba_file = seg.primaryDB.getSegmentDataDirectory() + "/pg_hba.conf"
+            cmd_str = "ssh %s cat %s" % (seg.primaryDB.getSegmentHostName(), pg_hba_file)
+            cmd = Command(name='Running remote command: %s' % cmd_str, cmdStr=cmd_str)
+            cmd.run(validateAfter=False)
+            pghba_contents = cmd.get_stdout().strip().split('\n')
+            found = False
+
+            for entry in pghba_contents:
+                contents = entry.strip()
+                if contents.startswith("host") and contents.endswith("trust") and "replication" in contents:
+                    tokens = contents.split()
+                    if len(tokens) != 5:
+                        raise Exception("failed to parse pg_hba.conf line '%s'" % contents)
+                    hostname = tokens[3].strip()
+                    if (search_hostname == hostname) or (search_ip_addr[0] in hostname):
+                        found = True
+                        break
+            if found:
+                raise Exception("replication entry for %s, ip_addr[0] %s still existing in pg_hba.conf '%s'"
+                                % (host, search_ip_addr[0], pghba_contents))

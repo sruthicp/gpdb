@@ -410,6 +410,7 @@ Feature: Tests for gpmovemirrors
         And the segments are synchronized
         # gpmovemirrors_input_group moves mirror on sdw3 to sdw2, corresponding primary should now have sdw2 entry
         And pg_hba file "/data/gpdata/primary/gpseg1/pg_hba.conf" on host "sdw1" contains entries for "sdw2"
+        And pg_hba file on primary of mirrors on "sdw2" contains no replication entries for "sdw3"
         And verify that mirror segments are in "group" configuration
         And verify that mirrors are recognized after a restart
         And the information of a "mirror" segment on a remote host is saved
