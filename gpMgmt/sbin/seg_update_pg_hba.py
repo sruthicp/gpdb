@@ -72,6 +72,22 @@ def remove_dup_add_entries(lines, entries):
 
     return out_entries
 
+def remove_stale_replication_entries(existing_hba, in_entries):
+    final_entries = []
+
+    # remove stale replication entries from pg_hba.conf while adding replication entries for new hosts.
+    if "replication" in in_entries:
+        entries_set = set(in_entries.split('\n'))
+        for line in existing_hba:
+            # ignoring existing replication entries for old mirror host
+            # and adding only new replication entries present in entries_set
+            if "replication" in line and line not in entries_set:
+                continue
+            final_entries.append(line.strip())
+    else:
+        final_entries = existing_hba
+    return final_entries
+
 def run_pg_ctl_reload(datadir):
     name = "pg_ctl reload"
     cmd_str = "$GPHOME/bin/pg_ctl reload -D %s" % datadir
@@ -83,7 +99,8 @@ def main():
     hba_filename = options.datadir +'/pg_hba.conf'
     lines, temp_hba_filename = read_from_hba_file_and_get_empty_tempfile(hba_filename)
     out_entries = remove_dup_add_entries(lines, options.entries)
-    write_entries(out_entries, temp_hba_filename, hba_filename)
+    final_entries = remove_stale_replication_entries(out_entries, options.entries)
+    write_entries(final_entries, temp_hba_filename, hba_filename)
     run_pg_ctl_reload(options.datadir)
 
 if __name__ == "__main__":
