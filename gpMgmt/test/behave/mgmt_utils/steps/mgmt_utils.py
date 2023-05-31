@@ -1560,6 +1560,7 @@ def impl(context, content_ids, expected_status):
 
 @given('the cluster configuration has no segments where "{filter}"')
 @when('the cluster configuration has no segments where "{filter}"')
+@then('the cluster configuration has no segments where "{filter}"')
 def impl(context, filter):
     SLEEP_PERIOD = 5
     MAX_DURATION = 300
@@ -3936,6 +3937,26 @@ def impl(context, slot):
                 result = dbconn.querySingleton(conn, query)
                 if result == 0:
                     raise Exception("Slot does not exist for host:{}, port:{}".format(host, port))
+
+@then('verify no replication connection between primary host and mirrors on {host}')
+@when('verify no replication connection between primary host and mirrors on {host}')
+@given('verify no replication connection between primary host and mirrors on {host}')
+def impl(context, host):
+    all_segments = GpArray.initFromCatalog(dbconn.DbURL()).getSegmentList()
+
+    for seg in all_segments:
+        if seg.mirrorDB.getSegmentHostName() != host:
+            continue
+
+        dbname = "template1"
+        query = "SELECT count(*) FROM pg_catalog.gp_stat_replication"
+        phost = seg.primaryDB.getSegmentHostName()
+        port = seg.primaryDB.getSegmentPort()
+        with closing(dbconn.connect(dbconn.DbURL(dbname=dbname, port=port, hostname=phost),
+                                    utility=True, unsetSearchPath=False)) as conn:
+            result = dbconn.querySingleton(conn, query)
+            if result != 0:
+                raise Exception("Replication connection is active for host:{}, port:{}".format(phost, port))
 
 
 @given('user waits until gp_stat_replication table has no pg_basebackup entries for content {contentids}')

@@ -10,7 +10,11 @@ from gppylib.gparray import GpArray, ROLE_PRIMARY, ROLE_MIRROR
 from test.behave_utils.utils import *
 import platform, shutil
 from behave import given, when, then
+<<<<<<< HEAD
 from gppylib.utils import writeLinesToFile
+=======
+import socket
+>>>>>>> d4d7500b49c (Adding Behave test cases for the changes)
 
 #TODO remove duplication of these functions
 def _get_gpAdminLogs_directory():
@@ -756,3 +760,42 @@ def get_host_address(hostname):
     return host_address[0]
 
 
+@then('pg_hba file on primary of mirrors on "{newhost}" contains no replication entries for "{oldhost}"')
+@when('pg_hba file on primary of mirrors on "{newhost}" contains no replication entries for "{oldhost}"')
+def impl(context, newhost, oldhost):
+    all_segments = GpArray.initFromCatalog(dbconn.DbURL()).getSegmentList()
+
+    for seg in all_segments:
+        if seg.mirrorDB.getSegmentHostName() != newhost:
+            continue
+        for host in oldhost.split(','):
+            search_hostname, _, search_ip_addr = socket.gethostbyaddr(host)
+            dbname = "template1"
+            query = "SELECT count(*) FROM pg_hba_file_rules where database='{{replication}}' and address='{}'or address='{}'".format(search_ip_addr[0],search_hostname)
+            host = seg.primaryDB.getSegmentHostName()
+            port = seg.primaryDB.getSegmentPort()
+            with closing(dbconn.connect(dbconn.DbURL(dbname=dbname, port=port, hostname=host),
+                                        utility=True, unsetSearchPath=False)) as conn:
+                result = dbconn.querySingleton(conn, query)
+                if result != 0:
+                    raise Exception("replication entry for %s, ip_addr[0] %s still existing in pg_hba.conf"
+                                                % (host, search_ip_addr[0]))
+
+@then("verify the walsender process on primary of {current_mirror} is not connected to {old_mirror}")
+def impl(context, current_mirror, old_mirror):
+    all_segments = GpArray.initFromCatalog(dbconn.DbURL()).getSegmentList()
+
+    for seg in all_segments:
+        if seg.mirrorDB.getSegmentHostName() != current_mirror:
+            continue
+        primary_host = seg.primaryDB.getSegmentHostName()
+        for host in old_mirror.split(','):
+            _, _, search_ip_addr = socket.gethostbyaddr(host)
+            cmd_str = "ssh %s %s" % (primary_host,
+                                         "ps uxww | grep %s | grep walsender" %(search_ip_addr[0]))
+            cmd = Command(name='Running remote command: %s' % cmd_str, cmdStr=cmd_str)
+            cmd.run(validateAfter=False)
+
+            if cmd.get_results().stdout.strip() != "":
+                raise Exception("walsender process on %s still connects to old mirror %s" % (primary_host, host))
+                
