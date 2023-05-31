@@ -4,7 +4,7 @@ import socket
 
 from gppylib import gplog
 from gppylib.commands.base import Command, WorkerPool, REMOTE
-from gppylib.commands import base, gp, unix
+from gppylib.commands import base, gp, unix, pg
 from gppylib.operations.initstandby import create_standby_pg_hba_entries
 
 logger = gplog.get_default_logger()
@@ -49,7 +49,6 @@ def create_entries(primary_hostname, mirror_hostname, hba_hostnames):
     return entries
 
 def update_on_segments(update_cmds, batch_size):
-
     num_workers = min(batch_size, len(update_cmds))
     pool = WorkerPool(num_workers)
     for uc in update_cmds:
@@ -157,3 +156,4 @@ def update_pg_hba_for_new_mirrors(PgHbaEntriesToUpdate, hba_hostnames, batch_siz
         return
 
     update_on_segments(update_cmds, batch_size)
+

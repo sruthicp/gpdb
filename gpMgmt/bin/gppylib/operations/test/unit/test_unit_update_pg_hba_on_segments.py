@@ -176,26 +176,3 @@ host replication gpadmin {ip_primary2}/32 trust"""
         self.assertEqual(result_batch_size, expected_batch_size)
         self.assertEqual(result_cmds[0].cmdStr, expected_string)
 
-    @patch('gppylib.operations.update_pg_hba_on_segments.kill_existing_walsenders_on_primary')
-    @patch('gppylib.operations.update_pg_hba_on_segments.update_on_segments')
-    @patch('gppylib.operations.update_pg_hba_on_segments.create_entries',
-            side_effect=[['entry0', 'entry1'], ['entry1', 'entry2']])
-    def test_update_pg_hba_on_segments_and_kill_existing_walsenders_on_primary(self, mock_entry, mock_update, mock_kill):
-        expected_batch_size = 16
-        update_pg_hba_on_segments(self.gparray, False, expected_batch_size)
-        self.logger.info.assert_any_call("killing existing walsender process on primary sdw1:40000")
-        self.logger.info.assert_any_call("killing existing walsender process on primary sdw2:40001")
-
-        self.assertEqual(mock_kill.call_count, 1)
-        mock_call_args = mock_kill.call_args[0]
-
-        result_cmds = mock_call_args[0]
-        result_batch_size = mock_call_args[1]
-
-        expected_string0 = "ps ux | grep walsender| grep 40000 | grep -v bash|tr -s ' ' | cut -d ' ' -f 2| xargs kill"
-        expected_string1 = "ps ux | grep walsender| grep 40001 | grep -v bash|tr -s ' ' | cut -d ' ' -f 2| xargs kill"
-
-        self.assertEqual(len(result_cmds), 2)
-        self.assertEqual(result_batch_size, expected_batch_size)
-        self.assertEqual(result_cmds[0].cmdStr, expected_string0)
-        self.assertEqual(result_cmds[1].cmdStr, expected_string1)
