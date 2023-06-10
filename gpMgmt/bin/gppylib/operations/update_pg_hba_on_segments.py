@@ -4,7 +4,7 @@ import socket
 
 from gppylib import gplog
 from gppylib.commands.base import Command, WorkerPool, REMOTE
-from gppylib.commands import base, gp, unix
+from gppylib.commands import base, gp, unix, pg
 from gppylib.operations.initstandby import create_standby_pg_hba_entries
 
 logger = gplog.get_default_logger()
@@ -49,7 +49,6 @@ def create_entries(primary_hostname, mirror_hostname, hba_hostnames):
     return entries
 
 def update_on_segments(update_cmds, batch_size):
-
     num_workers = min(batch_size, len(update_cmds))
     pool = WorkerPool(num_workers)
     for uc in update_cmds:
@@ -72,28 +71,6 @@ def update_on_segments(update_cmds, batch_size):
         logger.error("Unable to update pg_hba.conf on the primary segments")
         raise Exception("Unable to update pg_hba.conf on the primary segments.")
 
-def kill_existing_walsenders_on_primary(kill_cmds, batch_size):
-
-    num_workers = min(batch_size, len(kill_cmds))
-    pool = WorkerPool(num_workers)
-    for kc in kill_cmds:
-        pool.addCommand(kc)
-    try:
-        pool.join()
-    except Exception as e:
-        pool.haltWork()
-        pool.joinWorkers()
-    failure = False
-    for cmd in pool.getCompletedItems():
-        r = cmd.get_results()
-        if not cmd.was_successful():
-           logger.error("Unable to kill walsender on primary segment: " + str(r))
-           failure = True
-
-    pool.haltWork()
-    pool.joinWorkers()
-    if failure:
-        logger.error("Unable to kill walsender on primary segment")
 
 def update_pg_hba_on_segments_for_standby(gpArray, standby_host, hba_hostnames,
                                           batch_size):
@@ -131,7 +108,7 @@ def update_pg_hba_on_segments(gpArray, hba_hostnames, batch_size,
                               contents_to_update=None):
     logger.info("Starting to create new pg_hba.conf on primary segments")
     update_cmds = []
-    kill_cmds = []
+    primary_config = []
     unreachable_seg_hosts = []
 
     for segmentPair in gpArray.getSegmentList():
@@ -152,16 +129,8 @@ def update_pg_hba_on_segments(gpArray, hba_hostnames, batch_size,
 
         update_cmds.append(SegUpdateHba(entries, segmentPair.primaryDB.datadir,
                                         remoteHost=primary_hostname))
-
-        # killing the walsender process on the primary segment to stop
-        # any existing walsender<->walreceiver connections and to force new replication connections.
-        logger.info("killing existing walsender process on primary %s:%s"
-                    % (primary_hostname, primary_port))
-
-        cmd = Command("kill existing walsender process",
-                      "ps ux | grep walsender| grep %d | grep -v bash|tr -s ' ' | cut -d ' ' -f 2| xargs kill" % primary_port,
-                      ctxt=REMOTE, remoteHost=primary_hostname)
-        kill_cmds.append(cmd)
+        host_port_tuple = (primary_hostname, primary_port)
+        primary_config.append(host_port_tuple)
 
     if unreachable_seg_hosts:
         logger.warning("Not updating pg_hba.conf for segments on unreachable hosts: %s."
@@ -173,7 +142,10 @@ def update_pg_hba_on_segments(gpArray, hba_hostnames, batch_size,
         return
 
     update_on_segments(update_cmds, batch_size)
-    kill_existing_walsenders_on_primary(kill_cmds, batch_size)
+
+    # killing the walsender processes on the primary segment to stop
+    # any existing walsender<->walreceiver connections and to force new replication connections.
+    pg.kill_existing_walsenders_on_primary(primary_config, batch_size)
 
     logger.info("Successfully modified pg_hba.conf on primary segments to allow replication connections")
 
@@ -193,3 +165,4 @@ def update_pg_hba_for_new_mirrors(PgHbaEntriesToUpdate, hba_hostnames, batch_siz
         return
 
     update_on_segments(update_cmds, batch_size)
+

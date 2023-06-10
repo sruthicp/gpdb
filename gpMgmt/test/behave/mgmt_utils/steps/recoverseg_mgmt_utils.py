@@ -2,7 +2,7 @@ import glob
 import os
 import tempfile
 from time import sleep
-
+from gppylib.commands import gp
 from contextlib import closing
 from gppylib.commands.base import Command, ExecutionError, REMOTE, WorkerPool
 from gppylib.db import dbconn
@@ -10,11 +10,7 @@ from gppylib.gparray import GpArray, ROLE_PRIMARY, ROLE_MIRROR
 from test.behave_utils.utils import *
 import platform, shutil
 from behave import given, when, then
-<<<<<<< HEAD
 from gppylib.utils import writeLinesToFile
-=======
-import socket
->>>>>>> d4d7500b49c (Adding Behave test cases for the changes)
 
 #TODO remove duplication of these functions
 def _get_gpAdminLogs_directory():
@@ -760,42 +756,85 @@ def get_host_address(hostname):
     return host_address[0]
 
 
-@then('pg_hba file on primary of mirrors on "{newhost}" contains no replication entries for "{oldhost}"')
-@when('pg_hba file on primary of mirrors on "{newhost}" contains no replication entries for "{oldhost}"')
-def impl(context, newhost, oldhost):
+
+@then('pg_hba file on primary of mirrors on "{newhost}" with "{contents}" contains no replication entries for "{oldhost}"')
+@when('pg_hba file on primary of mirrors on "{newhost}" with "{contents}" contains no replication entries for "{oldhost}"')
+def impl(context, newhost, contents, oldhost):
     all_segments = GpArray.initFromCatalog(dbconn.DbURL()).getSegmentList()
 
     for seg in all_segments:
-        if seg.mirrorDB.getSegmentHostName() != newhost:
+        if newhost != "none" and seg.mirrorDB.getSegmentHostName() != newhost:
             continue
-        for host in oldhost.split(','):
-            search_hostname, _, search_ip_addr = socket.gethostbyaddr(host)
-            dbname = "template1"
-            query = "SELECT count(*) FROM pg_hba_file_rules where database='{{replication}}' and address='{}'or address='{}'".format(search_ip_addr[0],search_hostname)
-            host = seg.primaryDB.getSegmentHostName()
-            port = seg.primaryDB.getSegmentPort()
-            with closing(dbconn.connect(dbconn.DbURL(dbname=dbname, port=port, hostname=host),
-                                        utility=True, unsetSearchPath=False)) as conn:
-                result = dbconn.querySingleton(conn, query)
-                if result != 0:
-                    raise Exception("replication entry for %s, ip_addr[0] %s still existing in pg_hba.conf"
-                                                % (host, search_ip_addr[0]))
+        if contents != "all":
+            for content_id in contents.split(','):
+                if seg.mirrorDB.getSegmentContentId() != content_id:
+                    continue
+                check_entry_present(context, seg, oldhost)
+        else:
+            check_entry_present(context, seg, oldhost)
 
-@then("verify the walsender process on primary of {current_mirror} is not connected to {old_mirror}")
-def impl(context, current_mirror, old_mirror):
+def check_entry_present(context, seg, oldhost):
+    for host in oldhost.split(','):
+        search_ip_addr = context.host_ip_list[host]
+        dbname = "template1"
+        ip_address = tuple(search_ip_addr) if len(search_ip_addr) > 1 else "('{}')".format(search_ip_addr[0])
+        query = "SELECT count(*) FROM pg_hba_file_rules WHERE database='{{replication}}' AND (address='{0}' OR address IN {1})".format(
+            host, ip_address)
+        phost = seg.primaryDB.getSegmentHostName()
+        port = seg.primaryDB.getSegmentPort()
+        print(query)
+        with closing(dbconn.connect(dbconn.DbURL(dbname=dbname, port=port, hostname=phost),
+                                    utility=True, unsetSearchPath=False)) as conn:
+            result = dbconn.querySingleton(conn, query)
+            if result != 0:
+                raise Exception("{0} replication entry for {1}, {2} still existing in pg_hba.conf of {3}:{4}"
+                                .format(result, host, search_ip_addr,phost, port))
+
+
+@then('verify that only replication connection primary has is to {new_mirror}')
+@when('verify that only replication connection primary has is to {new_mirror}')
+@given('verify that only replication connection primary has is to {new_mirror}')
+def impl(context, new_mirror):
     all_segments = GpArray.initFromCatalog(dbconn.DbURL()).getSegmentList()
 
     for seg in all_segments:
-        if seg.mirrorDB.getSegmentHostName() != current_mirror:
+        if seg.mirrorDB.getSegmentHostName() != new_mirror:
             continue
-        primary_host = seg.primaryDB.getSegmentHostName()
-        for host in old_mirror.split(','):
-            _, _, search_ip_addr = socket.gethostbyaddr(host)
-            cmd_str = "ssh %s %s" % (primary_host,
-                                         "ps uxww | grep %s | grep walsender" %(search_ip_addr[0]))
-            cmd = Command(name='Running remote command: %s' % cmd_str, cmdStr=cmd_str)
-            cmd.run(validateAfter=False)
 
-            if cmd.get_results().stdout.strip() != "":
-                raise Exception("walsender process on %s still connects to old mirror %s" % (primary_host, host))
-                
+        dbname = "template1"
+        search_ip_addr = context.host_ip_list[new_mirror]
+        ip_address = tuple(search_ip_addr) if len(search_ip_addr) > 1 else "('{}')".format(search_ip_addr[0])
+        query = """
+        SELECT 'old_host'  AS condition, COUNT(*) AS count
+        FROM pg_catalog.gp_stat_replication
+        WHERE client_addr NOT IN {0}
+        UNION
+        SELECT 'new_host' AS condition, COUNT(*) AS count
+        FROM pg_catalog.gp_stat_replication where client_addr IN {1}
+        """.format(ip_address, ip_address)
+
+        phost = seg.primaryDB.getSegmentHostName()
+        port = seg.primaryDB.getSegmentPort()
+        with closing(dbconn.connect(dbconn.DbURL(dbname=dbname, port=port, hostname=phost),
+                                    utility=True, unsetSearchPath=False)) as conn:
+            rows = dbconn.query(conn, query).fetchall()
+            for row in rows:
+                condition = row[0]
+                count = row[1]
+
+                if condition == 'new_host':
+                    new_host_count = count
+                elif condition == 'old_host':
+                    old_host_count = count
+            if new_host_count == 0 or old_host_count != 0:
+                raise Exception("{} replication connections are not updated.".format(phost))
+
+
+@given('saving host IP address of "{host}"')
+@then('saving host IP address of "{host}"')
+@when('saving host IP address of "{host}"')
+def impl(context, host):
+    context.host_ip_list = {}
+    for host_name in host.split(','):
+        if_addrs = gp.IfAddrs.list_addrs(host_name)
+        context.host_ip_list[host_name] = if_addrs

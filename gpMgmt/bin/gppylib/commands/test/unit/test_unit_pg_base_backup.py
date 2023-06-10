@@ -4,10 +4,12 @@
 #
 
 import unittest
-from mock import call, Mock, patch
+from mock import call, Mock, patch, MagicMock
 from gppylib.commands import pg
-from test.unit.gp_unittest import GpTestCase, run_tests
 from pgdb import DatabaseError
+
+from gppylib.test.unit.gp_unittest import GpTestCase
+from gppylib.commands.base import CommandResult
 
 class TestUnitPgReplicationSlot(GpTestCase):
     def setUp(self):
@@ -182,6 +184,90 @@ class TestUnitPgBaseBackup(unittest.TestCase):
         self.assertNotIn("-x", base_backup.command_tokens)
         self.assertNotIn("--xlog", base_backup.command_tokens)
 
+class PgTests(GpTestCase):
+    def setUp(self):
+        self.apply_patches([
+            patch('gppylib.commands.pg.logger', return_value=Mock(spec=['log', 'info', 'debug', 'error', 'warning'])),
+            patch('gppylib.commands.pg.Command'),
+            patch('gppylib.commands.pg.WorkerPool')
+        ])
+        self.logger = self.get_mock_from_apply_patch('logger')
+        self.command = self.get_mock_from_apply_patch('Command')
+        self.workerpool = self.get_mock_from_apply_patch('WorkerPool')
+
+    def test_kill_existing_walsenders(self):
+        primary_config = [("sdw1", 20000), ("sdw1", 20001)]
+        batch_size = 5
+
+        # Prepare mock return values
+        mock_cmd_instance = self.command.return_value
+        mock_cmd_instance.get_results.return_value = None
+        worker_pool_mock = MagicMock()
+        worker_pool_mock.join.return_value = None
+        self.workerpool.return_value = worker_pool_mock
+        worker_pool_mock.getCompletedItems.return_value = [mock_cmd_instance]
+
+        # Run the function being tested
+        pg.kill_existing_walsenders_on_primary(primary_config, batch_size)
+
+        # Assertions
+        expected_calls = [
+            call.info('killing existing walsender process on primary sdw1:20000 to refresh replication connection'),
+            call.info('killing existing walsender process on primary sdw1:20001 to refresh replication connection')
+        ]
+        self.logger.info.assert_has_calls(expected_calls)
+
+        self.workerpool.assert_called_with(min(batch_size, 2))
+        self.logger.warning.assert_not_called()
+
+    def test_kill_existing_walsenders_failure(self):
+        primary_config = [("sdw1", 20000), ("sdw1", 20001)]
+        batch_size = 5
+
+        # Prepare mock return values
+        mock_cmd_instance1 = self.command.return_value
+        mock_cmd_instance1.was_successful.return_value = False
+        mock_cmd_instance2 = self.command.return_value
+        mock_cmd_instance2.was_successful.return_value = False
+        worker_pool_mock = MagicMock()
+        worker_pool_mock.join.return_value = None
+        self.workerpool.return_value = worker_pool_mock
+        worker_pool_mock.getCompletedItems.return_value = [mock_cmd_instance1, mock_cmd_instance2]
+
+        # Run the function being tested
+        pg.kill_existing_walsenders_on_primary(primary_config, batch_size)
+
+        # Assertions
+        self.workerpool.assert_called_with(min(batch_size, 2))
+        assert self.logger.warning.call_count == 2
+        args, _ = self.logger.warning.call_args
+        assert "Unable to kill walsender on primary host" in args[0]
+
+    @patch('gppylib.commands.pg.Command')
+    def test_kill_existing_walsenders_one_host_failure_and_other_succeed(self, mock_command):
+        primary_config = [("sdw1", 20000), ("sdw2", 20001)]
+        batch_size = 5
+
+        # Prepare mock return values
+        mock_cmd_instance1 = self.command.return_value
+        mock_cmd_instance1.remoteHost = "sdw1"
+        mock_cmd_instance1.was_successful.return_value = True
+        mock_cmd_instance2 = mock_command.return_value
+        mock_cmd_instance2.remoteHost = "sdw2"
+        mock_cmd_instance2.was_successful.return_value = False
+        worker_pool_mock = MagicMock()
+        worker_pool_mock.join.return_value = None
+        self.workerpool.return_value = worker_pool_mock
+        worker_pool_mock.getCompletedItems.return_value = [mock_cmd_instance1, mock_cmd_instance2]
+
+        # Run the function being tested
+        pg.kill_existing_walsenders_on_primary(primary_config, batch_size)
+
+        # Assertions
+        self.workerpool.assert_called_with(min(batch_size, 2))
+        self.logger.warning.assert_called_once()
+        args, _ = self.logger.warning.call_args
+        assert "Unable to kill walsender on primary host sdw2" in args[0]
 
 if __name__ == '__main__':
     run_tests()

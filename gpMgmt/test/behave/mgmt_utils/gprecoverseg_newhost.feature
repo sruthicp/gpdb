@@ -14,12 +14,14 @@ Feature: gprecoverseg tests involving migrating to a new host
       And the user runs gpconfig sets guc "wal_sender_timeout" with "15s"
       And the user runs "gpstop -air"
       And the cluster configuration is saved for "before"
+      And saving host IP address of <down>
       And segment hosts <down> are disconnected from the cluster and from the spare segment hosts <spare>
       And the cluster configuration has no segments where <down_sql>
       When the user runs <gprecoverseg_cmd>
       Then gprecoverseg should return a return code of 0
       And pg_hba file "/data/gpdata/mirror/gpseg0/pg_hba.conf" on host "<acting_primary>" contains entries for "<used>"
-      And pg_hba file on primary of mirrors on "<used>" contains no replication entries for <down>
+      And pg_hba file on primary of mirrors on "<used>" with "all" contains no replication entries for <down>
+      And verify that only replication connection primary has is to "<used>"
       And the cluster configuration is saved for "<test_case>"
       And the "before" and "<test_case>" cluster configuration matches with the expected for gprecoverseg newhost
       And the mirrors replicate and fail over and back correctly
@@ -167,18 +169,18 @@ Feature: gprecoverseg tests involving migrating to a new host
       And all the segments are running
       And the segments are synchronized
       And the cluster configuration is saved for "before"
+      And saving host IP address of "sdw1"
       And segment hosts "sdw1" are disconnected from the cluster and from the spare segment hosts "sdw5"
       And the cluster configuration has no segments where "hostname='sdw1' and status='u'"
       When the user runs "gprecoverseg -a -p sdw5"
       Then gprecoverseg should return a return code of 0
       And all the segments are running
-      And pg_hba file on primary of mirrors on "sdw5" contains no replication entries for "sdw1"
-      And verify the walsender process on primary of "sdw5" is not connected to sdw1
+      And pg_hba file on primary of mirrors on "sdw5" with "all" contains no replication entries for "sdw1"
+      And verify that only replication connection primary has is to "sdw5"
       And the user runs "gprecoverseg -ar"
       And segment hosts "sdw1" are reconnected to the cluster and to the spare segment hosts "none"
       And segment hosts "sdw5" are disconnected from the cluster and from the spare segment hosts "none"
       And the cluster configuration has no segments where "hostname='sdw5' and status='u'"
-      And verify no replication connection between primary host and mirrors on sdw5
       # making the cluster back to it's original state
       And segment hosts "sdw5" are reconnected to the cluster and to the spare segment hosts "none"
       And segment hosts "sdw1" are disconnected from the cluster and from the spare segment hosts "none"

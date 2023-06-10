@@ -70,29 +70,57 @@ host all gpadmin {ip_mirror3}/32 trust"""
 
     def test_remove_stale_replication_entries(self):
         existing_entries = """host replication gpadmin samehost trust
+host all gpadmin 10.0.0.1/32 trust
 host all gpadmin 10.0.0.2/32 trust
-host    all     gpadmin     10.0.0.1/32     trust
-host   replication   gpadmin   10.0.0.1/32   trust
-host   replication   gpadmin   10.0.0.2/32   trust""".split('\n')
+host replication gpadmin 10.0.0.1/32 trust
+host replication gpadmin 10.0.0.2/32 trust""".split('\n')
 
-        input_entries = 'host replication gpadmin samehost trust\nhost all gpadmin 10.0.0.2/32 trust\nhost   replication   gpadmin   10.0.0.2/32   trust'
+        input_entries = 'host replication gpadmin samehost trust\nhost all gpadmin 10.0.0.2/32 trust' \
+                        '\nhost replication gpadmin 10.0.0.2/32 trust\nhost replication gpadmin 10.0.0.3/32 trust'
 
-        result = seg_update_pg_hba.remove_stale_replication_entries(existing_entries, input_entries)
+        result = seg_update_pg_hba.remove_dup_add_entries(existing_entries, input_entries)
 
-        expected = """host replication gpadmin samehost trust
+        expected = """host all gpadmin 10.0.0.1/32 trust
 host all gpadmin 10.0.0.2/32 trust
-host    all     gpadmin     10.0.0.1/32     trust
-host   replication   gpadmin   10.0.0.2/32   trust""".split('\n')
+host replication gpadmin samehost trust
+host replication gpadmin 10.0.0.2/32 trust
+host replication gpadmin 10.0.0.3/32 trust""".split('\n')
         self.assertEqual(result, expected)
 
-    def test_remove_stale_replication_entries_with_standby_pg_hba_entries(self):
-        existing_entries = """host replication gpadmin samehost trust
+    def test_pg_hba_with_no_replication_entries(self):
+        existing_entries = """# standby coordinator host ip addresses
 host all gpadmin 10.0.0.2/32 trust
-host    all     gpadmin     10.0.0.1/32     trust
-host   replication   gpadmin   10.0.0.1/32   trust
-host   replication   gpadmin   10.0.0.2/32   trust""".split('\n')
+host all gpadmin 10.0.0.1/32 trust""".split('\n')
         input_entries = '# standby coordinator host ip addresses\nhost all gpadmin 10.0.0.2/32 trust'
 
-        result = seg_update_pg_hba.remove_stale_replication_entries(existing_entries, input_entries)
+        result = seg_update_pg_hba.remove_dup_add_entries(existing_entries, input_entries)
 
         self.assertEqual(result, existing_entries)
+
+    def test_remove_stale_replication_entries_without_removing_localhost(self):
+        existing_entries = """# Allow replication connections from localhost, by a user with the
+# replication privilege.
+local   replication     all                                     trust
+host    replication     all             127.0.0.1/32            trust
+host    replication     all             ::1/128                 trust
+host replication gpadmin samehost trust
+host all gpadmin 10.0.0.1/32 trust
+host all gpadmin 10.0.0.2/32 trust
+host replication gpadmin 10.0.0.1/32 trust
+host replication gpadmin 10.0.0.2/32 trust""".split('\n')
+        input_entries = 'host replication gpadmin samehost trust\nhost all gpadmin 10.0.0.2/32 trust\nhost replication gpadmin 10.0.0.2/32 trust'
+
+        result = seg_update_pg_hba.remove_dup_add_entries(existing_entries, input_entries)
+
+        expected = """# Allow replication connections from localhost, by a user with the
+# replication privilege.
+local   replication     all                                     trust
+host    replication     all             127.0.0.1/32            trust
+host    replication     all             ::1/128                 trust
+host all gpadmin 10.0.0.1/32 trust
+host all gpadmin 10.0.0.2/32 trust
+host replication gpadmin samehost trust
+host replication gpadmin 10.0.0.2/32 trust""".split('\n')
+
+        self.assertEqual(result, expected)
+

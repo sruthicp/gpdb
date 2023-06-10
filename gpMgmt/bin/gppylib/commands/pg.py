@@ -166,6 +166,34 @@ def killPgProc(db,procname,signal):
     cmd=Kill.remote("kill "+procname,procPID,signal,hostname)
     return (parentPID,procPID)
 
+def kill_existing_walsenders_on_primary(primary_config, batch_size):
+    kill_cmds = []
+    for host, port in primary_config:
+        logger.info("killing existing walsender process on primary {0}:{1} to refresh replication connection"
+                    .format(host, port))
+
+        cmd = Command("kill existing walsender process",
+                      "ps ux | grep walsender | grep {0} | grep -v grep| awk '{{print $ 2}}'| xargs -r kill"
+                      .format(port), ctxt=REMOTE, remoteHost=host)
+        kill_cmds.append(cmd)
+
+    num_workers = min(batch_size, len(kill_cmds))
+    pool = WorkerPool(num_workers)
+    for cmd in kill_cmds:
+        pool.addCommand(cmd)
+    try:
+        pool.join()
+    except Exception as e:
+        pool.haltWork()
+        pool.joinWorkers()
+
+    for cmd in pool.getCompletedItems():
+        if not cmd.was_successful():
+            logger.warning("Unable to kill walsender on primary host {0}"
+                           .format(cmd.remoteHost))
+
+    pool.haltWork()
+    pool.joinWorkers()
 
 class PgReplicationSlot:
     """
