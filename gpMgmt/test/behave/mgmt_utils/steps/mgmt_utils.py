@@ -12,6 +12,7 @@ import _thread
 import time
 from subprocess import check_output, Popen, PIPE
 import subprocess
+import multiprocessing
 from collections import defaultdict
 
 import psutil
@@ -472,11 +473,11 @@ def impl(context, logdir):
             raise Exception('Timed out after {} retries'.format(num_retries))
 
 
-@then( 'verify if the gprecoverseg.lock directory is present in coordinator_data_directory')
-def impl(context):
-    gprecoverseg_lock_file = "%s/gprecoverseg.lock" % gp.get_coordinatordatadir()
-    if not os.path.exists(gprecoverseg_lock_file):
-        raise Exception('gprecoverseg.lock directory does not exist')
+@then( 'verify if the {lock_file} directory is present in coordinator_data_directory')
+def impl(context, lock_file):
+    utility_lock_file = "%s/%s" % (gp.get_coordinatordatadir(), lock_file)
+    if not os.path.exists(utility_lock_file):
+        raise Exception('{0} directory does not exist'.format(utility_lock_file))
     else:
         return
 
@@ -3695,7 +3696,10 @@ def impl(context):
 
 
 @when('the user runs {command} and selects {input}')
+@then('the user runs {command} and selects {input}')
 def impl(context, command, input):
+    if input == "none":
+        input = os.linesep
     p = Popen(command.split(), stdout=PIPE, stdin=PIPE, stderr=PIPE)
     stdout, stderr = p.communicate(input=input.encode())
 
@@ -3704,6 +3708,28 @@ def impl(context, command, input):
     context.ret_code = p.returncode
     context.stdout_message = stdout.decode()
     context.error_message = stderr.decode()
+
+@when('the user runs {command}, selects {input} and interrupt the process')
+def impl(context, command, input):
+    p = Popen(command.split(), stdout=PIPE, stdin=PIPE, stderr=PIPE)
+    p.stdin.write(input.encode())
+    p.stdin.flush()
+    time.sleep(120)
+    # interrupt the process.
+    p.terminate()
+    p.communicate(input=input.encode())
+
+@given("a sample gpstop lock file is created")
+def impl(context):
+    process = multiprocessing.Process(target=time.sleep, args=(60,))
+    process.start()
+    lock_dir = os.path.join(os.getenv("COORDINATOR_DATA_DIRECTORY"), "gpstop.lock")
+    if not os.path.exists(lock_dir):
+        os.makedirs(lock_dir)
+    lock_file_path = os.path.join(lock_dir, "PID")
+    process_id = process.pid
+    with open(lock_file_path, "w") as file:
+        file.write(str(process_id))
 
 def are_on_different_subnets(primary_hostname, mirror_hostname):
     primary_broadcast = check_output(['ssh', '-n', primary_hostname, "/sbin/ip addr show | grep 'inet .* brd' | awk '{ print $4 }'"])
