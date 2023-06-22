@@ -3664,6 +3664,7 @@ def impl(context):
 
 
 @when('the user runs {command} and selects {input}')
+@then('the user runs {command} and selects {input}')
 def impl(context, command, input):
     p = Popen(command.split(), stdout=PIPE, stdin=PIPE, stderr=PIPE)
     stdout, stderr = p.communicate(input=input.encode())
@@ -3673,6 +3674,16 @@ def impl(context, command, input):
     context.ret_code = p.returncode
     context.stdout_message = stdout.decode()
     context.error_message = stderr.decode()
+
+@when('the user runs {command}, selects {input} and interrupt the process')
+def impl(context, command, input):
+    p = Popen(command.split(), stdout=PIPE, stdin=PIPE, stderr=PIPE)
+    p.stdin.write(input.encode())
+    p.stdin.flush()
+    time.sleep(120)
+    # interrupt the process.
+    p.terminate()
+    p.communicate(input=input.encode())
 
 def are_on_different_subnets(primary_hostname, mirror_hostname):
     primary_broadcast = check_output(['ssh', '-n', primary_hostname, "/sbin/ip addr show | grep 'inet .* brd' | awk '{ print $4 }'"])

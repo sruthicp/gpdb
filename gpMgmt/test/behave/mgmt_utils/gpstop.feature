@@ -65,3 +65,73 @@ Feature: gpstop behave tests
           And gpstop should print "Commencing Coordinator instance shutdown with mode='immediate'" to stdout
          Then gpstop should return a return code of 0
           And verify no postgres process is running on all hosts
+
+    @concourse_cluster
+    Scenario Outline: when the first gpstop interrupted and second gpstop handles the unfinished state with <scenario> mode
+        Given the database is running
+        And the user asynchronously runs "psql postgres" and the process is saved
+        And running postgres processes are saved in context
+        When the user runs gpstop -a, selects s and interrupt the process
+        And the user runs gpstop -a and selects <option>
+        And gpstop should print "The database is currently in the process of shutting down." to stdout
+        And gpstop should print "'\(f\)ast_mode', '\(i\)mmediate_mode'" to stdout
+        And gpstop should print "Removing coordinator processes stuck in shutdown state from previous gpstop." to stdout
+        And gpstop should print "Running gpstart in coordinator_only mode." to stdout
+        Then gpstop should return a return code of 0
+        And verify no postgres process is running on all hosts
+        Examples:
+        | scenario  | option  |
+        | immediate | i       |
+        | fast      | f       |
+
+    @concourse_cluster
+    @demo_cluster
+    Scenario Outline: when the first gpstop interrupted and second gpstop with <scenario> succeed
+        Given the database is running
+        And the user asynchronously runs "psql postgres" and the process is saved
+        And running postgres processes are saved in context
+        When the user runs gpstop -a, selects s and interrupt the process
+        And the user runs <command> and selects f
+        And gpstop should print "The database is currently in the process of shutting down." to stdout
+        And gpstop should print "'\(f\)ast_mode', '\(i\)mmediate_mode'" to stdout
+        And gpstop should print "Removing coordinator processes stuck in shutdown state from previous gpstop." to stdout
+        And gpstop should print "Running gpstart in coordinator_only mode." to stdout
+        Then gpstop should return a return code of 0
+        Examples:
+        | scenario           | command          |
+        | timeout            | gpstop -a -t 130 |
+        | skip_standby       | gpstop -ay       |
+        | coordinator_only   | gpstop -am       |
+
+    @concourse_cluster
+    @demo_cluster
+    Scenario: when the first gpstop interrupted and second gpstop with restart option succeed
+        Given the database is running
+        And the user asynchronously runs "psql postgres" and the process is saved
+        And running postgres processes are saved in context
+        When the user runs gpstop -a, selects s and interrupt the process
+        And the user runs gpstop -ar and selects f
+        And gpstop should print "The database is currently in the process of shutting down." to stdout
+        And gpstop should print "'\(f\)ast_mode', '\(i\)mmediate_mode'" to stdout
+        And gpstop should print "Removing coordinator processes stuck in shutdown state from previous gpstop." to stdout
+        And gpstop should print "Running gpstart in coordinator_only mode." to stdout
+        Then gpstop should return a return code of 0
+        # proceeding graceful shutdown of the database.
+        And the user runs gpstop -a and selects f
+        And gpstop should return a return code of 0
+      
+
+    @concourse_cluster
+    @demo_cluster
+    Scenario: when the first gpstop interrupted and second gpstop with sighup option fails
+        Given the database is running
+        And the user asynchronously runs "psql postgres" and the process is saved
+        And running postgres processes are saved in context
+        When the user runs gpstop -a, selects s and interrupt the process
+        And the user runs "gpstop -u"
+        And gpstop should print "The database is currently in the process of shutting down." to stdout
+        And gpstop should print "Failed to send SIGHUP to postmaster. Please use 'gpstop' to complete the cluster shutdown." to stdout
+        Then gpstop should return a return code of 1
+        # proceeding graceful shutdown of the database.
+        And the user runs gpstop -a and selects f
+        And gpstop should return a return code of 0
