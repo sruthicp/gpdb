@@ -160,51 +160,7 @@ class GpStop:
         Run and return the exitCode for the program
         """
 
-        # setting the retry_count to 2 as we need to run self._prepare() again
-        # after handling database shutting down state.
-        retry_count = 2
-        for _ in range(retry_count):
-            try:
-                self._prepare()
-                break
-            except Exception as exc:
-                if "the database system is shutting down" in str(exc):
-                    logger.warning("The database is currently in the process of shutting down.")
-
-                    if self.sighup:
-                        logger.fatal("Failed to send SIGHUP to postmaster. "
-                                     "Please use 'gpstop' to complete the cluster shutdown.")
-                        sys.exit(1)
-                    logger.info("Complete the shutdown in fast mode or immediate mode.")
-
-                    # Prompt user for mode selection
-                    mode_selection = userinput.ask_string("Your_choice", "['(f)ast_mode', '(i)mmediate_mode']", 'f',
-                                                          ['f', 'i'])
-                    logger.info("Your choice was '{0}'".format(mode_selection))
-
-                    # Set mode based on user selection
-                    self.mode = 'fast' if mode_selection == 'f' else 'immediate'
-
-                    # Kill the postgres processes
-                    logger.info("Removing coordinator processes stuck in shutdown state from previous gpstop.")
-                    cmd = Command('kill postgres processes', cmdStr="pkill postgres")
-                    try:
-                        cmd.run(validateAfter=True)
-                    except Exception as e:
-                        logger.error("Unable to kill postgres processes: {0}".format(str(e)))
-                        return False
-
-                    # Start gpstart in coordinator_only mode to get the segment informations.
-                    logger.info("Running gpstart in coordinator_only mode.")
-                    gpcmd = gp.GpStart("running gpstart -am", coordinatorOnly=True)
-                    try:
-                        gpcmd.run(validateAfter=True)
-                    except Exception as e:
-                        logger.error("Coordinator_only startup failed: {0}".format(str(e)))
-                        return False
-                else:
-                    # If there is any other exception, raise it.
-                    raise
+        self._prepare()
 
         if self.coordinatoronly:
             if self.interactive:
@@ -300,6 +256,8 @@ class GpStop:
         gp.check_permissions(self.user)
         self._read_postgresqlconf()
         self._check_db_running()
+        if self._is_db_shutting_down():
+            self._handle_shutdown_state()
         self._build_gparray()
         if self.onlyThisHost:
             self._is_hostname_valid()
@@ -358,6 +316,51 @@ class GpStop:
         logger.info("Obtaining Segment details from coordinator...")
         self.dburl = dbconn.DbURL(port=self.port, dbname='template1')
         self.gparray = GpArray.initFromCatalog(self.dburl, utility=True)
+
+    def _handle_shutdown_state(self):
+        if self.sighup:
+            logger.fatal("Failed to send SIGHUP to postmaster. "
+                         "Please use 'gpstop' to complete the cluster shutdown.")
+            sys.exit(1)
+
+        logger.info("Complete the shutdown in fast mode or immediate mode.")
+        # Prompt user for mode selection
+        mode_selection = userinput.ask_string("Your_choice", "['(f)ast_mode', '(i)mmediate_mode']", 'f',
+                                              ['f', 'i'])
+        logger.info("Your choice was '{0}'".format(mode_selection))
+        # Set mode based on user selection
+        self.mode = 'fast' if mode_selection == 'f' else 'immediate'
+
+        # cleanup coordinator processes stuck in shutting down state
+        self._kill_orphaned_processes()
+        # Start gpstart in coordinator_only mode to get the segment informations.
+        self._start_db_coordinatoronly()
+
+    def _is_db_shutting_down(self):
+        logger.info("Checking Greenplum DB is in shutting down state")
+        try:
+            self.dburl = dbconn.DbURL(port=self.port, dbname='template1')
+            with closing(dbconn.connect(self.dburl)) as conn:
+                return False
+        except Exception as exc:
+            if "the database system is shutting down" in str(exc):
+                logger.warning("The database is currently in the process of shutting down.")
+                return True
+            else:
+                return False
+
+    def _kill_orphaned_processes(self):
+        logger.info("Removing coordinator processes stuck in shutdown state.")
+        pids = gp.get_postgres_segment_processes(self.coordinator_datadir, self.dburl.pghost)
+        unix.kill_9_segment_processes(self.coordinator_datadir, pids, self.dburl.pghost)
+
+    def _start_db_coordinatoronly(self):
+        logger.info("Running gpstart in coordinator_only mode.")
+        cmd = gp.GpStart("running gpstart -am", coordinatorOnly=True)
+        cmd.run(validateAfter=True)
+        if cmd.results.rc != 0:
+            logger.fatal("Unable to start the cluster in coordinator_only mode: {0}".format(cmd.results.stderr))
+            sys.exit(1)
 
     class _SigIntHandler(object):
         def __init__(self):

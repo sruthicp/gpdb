@@ -11,7 +11,7 @@ from mock import Mock, call, patch
 from gppylib.gparray import Segment, GpArray, SegmentPair
 from gppylib.test.unit.gp_unittest import GpTestCase, run_tests
 from gppylib.commands import base
-from gppylib.commands.base import Command, WorkerPool
+from gppylib.commands.base import Command, WorkerPool, CommandResult
 from gppylib.commands.gp import GpSegStopCmd
 from gppylib.mainUtils import ProgramArgumentValidationException
 
@@ -467,117 +467,96 @@ class GpStop(GpTestCase):
         self.assertTrue("Stopping coordinator standby host scdw mode=fast" not in log_message)
         self.assertTrue("No standby coordinator host configured" not in log_message)
 
-    @patch('gppylib.commands.base.Command.run')
-    @patch('gpstop.GpArray.initFromCatalog')
+    @patch('gppylib.commands.base.Command')
+    @patch('gpstop.gp.GpStart')
     @patch('gpstop.userinput', return_value=Mock(spec=['ask_string']))
-    def test_gpstop_fast_if_previous_gpstop_was_interrupted(self, mock_userinput, mock_initFromCatalog, mockCmd):
+    @patch('gppylib.db.dbconn.connect', side_effect=Exception('the database system is shutting down'))
+    def test_gpstop_fast_if_previous_gpstop_was_interrupted(self, mock_dbconn, mock_userinput, mockGpStart, mockCmd):
         sys.argv = ["gpstop", "-a"]
         parser = self.subject.GpStop.createParser()
         options, args = parser.parse_args()
 
-        mock_initFromCatalog.side_effect = [Exception('the database system is shutting down'),
-                                            self.gparray]
         mock_userinput.ask_string.return_value = 'f'
-
+        mockCmd.results = CommandResult(0, ''.encode(), ''.encode(), True, False)
+        mockGpStart.return_value = mockCmd
         gpstop = self.subject.GpStop.createProgram(options, args)
         gpstop.run()
 
         self.assertEqual(mock_userinput.ask_string.call_count, 1)
         self.subject.logger.warning.assert_any_call("The database is currently in the process of shutting down.")
         self.subject.logger.info.assert_any_call("Your choice was 'f'")
-        self.subject.logger.info.assert_any_call("Removing coordinator processes stuck in shutdown state from previous gpstop.")
+        self.subject.logger.info.assert_any_call("Removing coordinator processes stuck in shutdown state.")
         self.subject.logger.info.assert_any_call("Running gpstart in coordinator_only mode.")
         self.subject.logger.info.assert_any_call("Database successfully shutdown with no errors reported")
 
-    @patch('gppylib.commands.base.Command.run')
-    @patch('gpstop.GpArray.initFromCatalog')
+    @patch('gppylib.commands.base.Command')
+    @patch('gpstop.gp.GpStart')
     @patch('gpstop.userinput', return_value=Mock(spec=['ask_string']))
-    def test_gpstop_immediate_if_previous_gpstop_was_interrupted(self, mock_userinput, mock_initFromCatalog, mockCmd):
+    @patch('gppylib.db.dbconn.connect', side_effect=Exception('the database system is shutting down'))
+    def test_gpstop_immediate_if_previous_gpstop_was_interrupted(self, mock_dbconn, mock_userinput, mockGpStart, mockCmd):
         sys.argv = ["gpstop", "-a"]
         parser = self.subject.GpStop.createParser()
         options, args = parser.parse_args()
-        mock_initFromCatalog.side_effect = [Exception('the database system is shutting down'),
-                                            self.gparray]
 
         mock_userinput.ask_string.return_value = 'i'
-
+        mockCmd.results = CommandResult(0, ''.encode(), ''.encode(), True, False)
+        mockGpStart.return_value = mockCmd
         gpstop = self.subject.GpStop.createProgram(options, args)
         gpstop.run()
 
         self.assertEqual(mock_userinput.ask_string.call_count, 1)
         self.subject.logger.warning.assert_any_call("The database is currently in the process of shutting down.")
         self.subject.logger.info.assert_any_call("Your choice was 'i'")
-        self.subject.logger.info.assert_any_call("Removing coordinator processes stuck in shutdown state from previous gpstop.")
+        self.subject.logger.info.assert_any_call("Removing coordinator processes stuck in shutdown state.")
         self.subject.logger.info.assert_any_call("Running gpstart in coordinator_only mode.")
         self.subject.logger.info.assert_any_call("Database successfully shutdown with no errors reported")
 
-    @patch('gppylib.commands.base.Command.run')
-    @patch('gpstop.GpArray.initFromCatalog')
-    @patch('gpstop.userinput', return_value=Mock(spec=['ask_string']))
-    def test_gpstop_fails_to_kill_coordinator_process_after_interrupt(self, mock_userinput, mock_initFromCatalog, mockCmd):
-        sys.argv = ["gpstop", "-ar"]
-        parser = self.subject.GpStop.createParser()
-        options, args = parser.parse_args()
-
-        mock_initFromCatalog.side_effect = [Exception('the database system is shutting down')]
-
-        mock_userinput.ask_string.return_value = 'f'
-        mockCmd.side_effect = [Exception('error')]
-        gpstop = self.subject.GpStop.createProgram(options, args)
-        gpstop.run()
-
-        self.assertEqual(mock_userinput.ask_string.call_count, 1)
-        self.subject.logger.warning.assert_any_call("The database is currently in the process of shutting down.")
-        self.subject.logger.info.assert_any_call("Your choice was 'f'")
-        self.subject.logger.info.assert_any_call("Removing coordinator processes stuck in shutdown state from previous gpstop.")
-        self.subject.logger.error.assert_any_call("Unable to kill postgres processes: error")
-
-    @patch('gppylib.commands.base.Command.run')
+    @patch('gppylib.commands.base.Command')
+    @patch('sys.exit')
     @patch('gpstop.gp.GpStart')
-    @patch('gpstop.GpArray.initFromCatalog')
     @patch('gpstop.userinput', return_value=Mock(spec=['ask_string']))
-    def test_gpstop_fails_to_gpstart_coordinator_after_interrupt(self, mock_userinput, mock_initFromCatalog, mockGpstart, mockCmd):
+    @patch('gppylib.db.dbconn.connect', side_effect=Exception('the database system is shutting down'))
+    def test_gpstop_fails_to_gpstart_coordinator_after_interrupt(self, mock_dbconn, mock_userinput, mockGpstart, mockExit, mockCmd):
         sys.argv = ["gpstop", "-am"]
         parser = self.subject.GpStop.createParser()
         options, args = parser.parse_args()
 
-        mock_initFromCatalog.side_effect = [Exception('the database system is shutting down')]
-
         mock_userinput.ask_string.return_value = 'f'
-        mockCmd.run.side_effect = Exception('error')
-        mockGpstart.return_value = mockCmd
+        mockCmd.results = CommandResult(1, ''.encode(), ''.encode(), True, False)
+        mockGpstart.run.return_value = mockCmd
 
         gpstop = self.subject.GpStop.createProgram(options, args)
         gpstop.run()
 
+        mockExit.assert_called_once_with(1)
         self.assertEqual(mock_userinput.ask_string.call_count, 1)
         self.subject.logger.warning.assert_any_call("The database is currently in the process of shutting down.")
         self.subject.logger.info.assert_any_call("Your choice was 'f'")
-        self.subject.logger.info.assert_any_call("Removing coordinator processes stuck in shutdown state from previous gpstop.")
+        self.subject.logger.info.assert_any_call("Removing coordinator processes stuck in shutdown state.")
         self.subject.logger.info.assert_any_call("Running gpstart in coordinator_only mode.")
-        self.subject.logger.error.assert_any_call("Coordinator_only startup failed: error")
+        args, kwargs = self.subject.logger.fatal.call_args
+        assert "Unable to start the cluster in coordinator_only mode" in args[0]
 
-    @patch('sys.exit')
-    @patch('gpstop.GpArray.initFromCatalog')
+    @patch('gppylib.db.dbconn.connect', side_effect=Exception('the database system is shutting down'))
     @patch('gpstop.userinput', return_value=Mock(spec=['ask_string']))
-    def test_gpstop_sighup_option_after_interrupt(self, mock_userinput, mock_initFromCatalog, mockExit):
+    def test_gpstop_sighup_option_after_interrupt(self, mock_userinput, mock_dbconn):
         sys.argv = ["gpstop", "-u"]
         parser = self.subject.GpStop.createParser()
         options, args = parser.parse_args()
-        mock_initFromCatalog.side_effect = [Exception('the database system is shutting down')]
 
         gpstop = self.subject.GpStop.createProgram(options, args)
-        gpstop.run()
-        mockExit.assert_called_once_with(1)
+        with self.assertRaises(SystemExit):
+            gpstop.run()
 
         self.subject.logger.warning.assert_any_call("The database is currently in the process of shutting down.")
         self.subject.logger.fatal.assert_any_call("Failed to send SIGHUP to postmaster. "
-                                     "Please use 'gpstop' to complete the cluster shutdown.")
+                                                  "Please use 'gpstop' to complete the cluster shutdown.")
 
 
     @patch('gpstop.GpArray.initFromCatalog')
+    @patch('gppylib.db.dbconn.connect', side_effect=Exception('unexpected exception'))
     @patch('gpstop.userinput', return_value=Mock(spec=['ask_string']))
-    def test_gpstop_raise_exception_other_than_database_system_shutting_down(self, mock_userinput, mock_initFromCatalog):
+    def test_gpstop_raise_exception_other_than_database_system_shutting_down(self, mock_userinput, mock_dbconn, mock_initFromCatalog):
         sys.argv = ["gpstop", "-a"]
         parser = self.subject.GpStop.createParser()
         options, args = parser.parse_args()

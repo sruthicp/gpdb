@@ -75,7 +75,7 @@ Feature: gpstop behave tests
         And the user runs gpstop -a and selects <option>
         And gpstop should print "The database is currently in the process of shutting down." to stdout
         And gpstop should print "'\(f\)ast_mode', '\(i\)mmediate_mode'" to stdout
-        And gpstop should print "Removing coordinator processes stuck in shutdown state from previous gpstop." to stdout
+        And gpstop should print "Removing coordinator processes stuck in shutdown state." to stdout
         And gpstop should print "Running gpstart in coordinator_only mode." to stdout
         Then gpstop should return a return code of 0
         And verify no postgres process is running on all hosts
@@ -94,7 +94,7 @@ Feature: gpstop behave tests
         And the user runs <command> and selects f
         And gpstop should print "The database is currently in the process of shutting down." to stdout
         And gpstop should print "'\(f\)ast_mode', '\(i\)mmediate_mode'" to stdout
-        And gpstop should print "Removing coordinator processes stuck in shutdown state from previous gpstop." to stdout
+        And gpstop should print "Removing coordinator processes stuck in shutdown state." to stdout
         And gpstop should print "Running gpstart in coordinator_only mode." to stdout
         Then gpstop should return a return code of 0
         Examples:
@@ -113,7 +113,7 @@ Feature: gpstop behave tests
         And the user runs gpstop -ar and selects f
         And gpstop should print "The database is currently in the process of shutting down." to stdout
         And gpstop should print "'\(f\)ast_mode', '\(i\)mmediate_mode'" to stdout
-        And gpstop should print "Removing coordinator processes stuck in shutdown state from previous gpstop." to stdout
+        And gpstop should print "Removing coordinator processes stuck in shutdown state." to stdout
         And gpstop should print "Running gpstart in coordinator_only mode." to stdout
         Then gpstop should return a return code of 0
         # proceeding graceful shutdown of the database.
