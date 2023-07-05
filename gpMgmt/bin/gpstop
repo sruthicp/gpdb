@@ -332,7 +332,10 @@ class GpStop:
         self.mode = 'fast' if mode_selection == 'f' else 'immediate'
 
         # cleanup coordinator processes stuck in shutting down state
-        self._kill_orphaned_processes()
+        logger.info("Removing coordinator processes stuck in shutdown state.")
+        pids = gp.get_postgres_segment_processes(self.coordinator_datadir, self.dburl.pghost)
+        unix.kill_9_segment_processes(self.coordinator_datadir, pids, self.dburl.pghost)
+
         # Start gpstart in coordinator_only mode to get the segment informations.
         self._start_db_coordinatoronly()
 
@@ -348,11 +351,6 @@ class GpStop:
                 return True
             else:
                 return False
-
-    def _kill_orphaned_processes(self):
-        logger.info("Removing coordinator processes stuck in shutdown state.")
-        pids = gp.get_postgres_segment_processes(self.coordinator_datadir, self.dburl.pghost)
-        unix.kill_9_segment_processes(self.coordinator_datadir, pids, self.dburl.pghost)
 
     def _start_db_coordinatoronly(self):
         logger.info("Running gpstart in coordinator_only mode.")
@@ -963,6 +961,15 @@ class GpStop:
                       logfileDirectory=logfileDirectory,
                       onlyThisHost=options.only_this_host)
 
+    @staticmethod
+    def mainOptions():
+        """
+        This method returns a dictionary instructing simple_main to check for
+        a gpstop.lock file under COORDINATOR_DATA_DIRECTORY in order to prevent
+        the customer from running multiple instances of gpstop.
+        """
+        return {'pidlockpath': 'gpstop.lock', 'parentpidvar': 'GPSTOPPID'}
 
 if __name__ == '__main__':
-    simple_main(GpStop.createParser, GpStop.createProgram)
+    simple_main(GpStop.createParser, GpStop.createProgram, GpStop.mainOptions())
+

@@ -471,11 +471,11 @@ def impl(context, logdir):
             raise Exception('Timed out after {} retries'.format(num_retries))
 
 
-@then( 'verify if the gprecoverseg.lock directory is present in coordinator_data_directory')
-def impl(context):
-    gprecoverseg_lock_file = "%s/gprecoverseg.lock" % gp.get_coordinatordatadir()
-    if not os.path.exists(gprecoverseg_lock_file):
-        raise Exception('gprecoverseg.lock directory does not exist')
+@then( 'verify if the {lock_file} directory is present in coordinator_data_directory')
+def impl(context, lock_file):
+    utility_lock_file = "%s/%s" % (gp.get_coordinatordatadir(), lock_file)
+    if not os.path.exists(utility_lock_file):
+        raise Exception('{0} directory does not exist'.format(utility_lock_file))
     else:
         return
 

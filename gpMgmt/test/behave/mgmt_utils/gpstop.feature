@@ -72,6 +72,8 @@ Feature: gpstop behave tests
         And the user asynchronously runs "psql postgres" and the process is saved
         And running postgres processes are saved in context
         When the user runs gpstop -a, selects s and interrupt the process
+        Then verify if the gpstop.lock directory is present in coordinator_data_directory
+        And the user runs command "rm -rf $COORDINATOR_DATA_DIRECTORY/gpstop.lock"
         And the user runs gpstop -a and selects <option>
         And gpstop should print "The database is currently in the process of shutting down." to stdout
         And gpstop should print "'\(f\)ast_mode', '\(i\)mmediate_mode'" to stdout
@@ -91,6 +93,8 @@ Feature: gpstop behave tests
         And the user asynchronously runs "psql postgres" and the process is saved
         And running postgres processes are saved in context
         When the user runs gpstop -a, selects s and interrupt the process
+        Then verify if the gpstop.lock directory is present in coordinator_data_directory
+        And the user runs command "rm -rf $COORDINATOR_DATA_DIRECTORY/gpstop.lock"
         And the user runs <command> and selects f
         And gpstop should print "The database is currently in the process of shutting down." to stdout
         And gpstop should print "'\(f\)ast_mode', '\(i\)mmediate_mode'" to stdout
@@ -110,6 +114,8 @@ Feature: gpstop behave tests
         And the user asynchronously runs "psql postgres" and the process is saved
         And running postgres processes are saved in context
         When the user runs gpstop -a, selects s and interrupt the process
+        Then verify if the gpstop.lock directory is present in coordinator_data_directory
+        And the user runs command "rm -rf $COORDINATOR_DATA_DIRECTORY/gpstop.lock"
         And the user runs gpstop -ar and selects f
         And gpstop should print "The database is currently in the process of shutting down." to stdout
         And gpstop should print "'\(f\)ast_mode', '\(i\)mmediate_mode'" to stdout
@@ -128,6 +134,8 @@ Feature: gpstop behave tests
         And the user asynchronously runs "psql postgres" and the process is saved
         And running postgres processes are saved in context
         When the user runs gpstop -a, selects s and interrupt the process
+        Then verify if the gpstop.lock directory is present in coordinator_data_directory
+        And the user runs command "rm -rf $COORDINATOR_DATA_DIRECTORY/gpstop.lock"
         And the user runs "gpstop -u"
         And gpstop should print "The database is currently in the process of shutting down." to stdout
         And gpstop should print "Failed to send SIGHUP to postmaster. Please use 'gpstop' to complete the cluster shutdown." to stdout
@@ -135,3 +143,4 @@ Feature: gpstop behave tests
         # proceeding graceful shutdown of the database.
         And the user runs gpstop -a and selects f
         And gpstop should return a return code of 0
+
