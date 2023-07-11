@@ -169,11 +169,11 @@ def killPgProc(db,procname,signal):
 def kill_existing_walsenders_on_primary(primary_config, batch_size):
     kill_cmds = []
     for config in primary_config:
-        logger.info("killing existing walsender process on primary {0}:{1}"
+        logger.info("killing existing walsender process on primary {0}:{1} to refresh replication connection"
                     .format(config[0], config[1]))
 
         cmd = Command("kill existing walsender process",
-                      "ps ux | grep walsender| grep {0} |awk '{{print $ 2}}'| xargs kill"
+                      "ps ux | grep [w]alsender | grep {0} |awk '{{print $ 2}}'| xargs -r kill"
                       .format(config[1]), ctxt=REMOTE, remoteHost=config[0])
         kill_cmds.append(cmd)
 
@@ -189,7 +189,7 @@ def kill_existing_walsenders_on_primary(primary_config, batch_size):
 
     for cmd in pool.getCompletedItems():
         result = cmd.get_results()
-        if not cmd.was_successful():
+        if result is not None and result.stderr:
             logger.warning("Unable to kill walsender on primary: cmd={0} stdout={1} stderr={2}"
                            .format(cmd.cmdStr, result.stdout, result.stderr))
 

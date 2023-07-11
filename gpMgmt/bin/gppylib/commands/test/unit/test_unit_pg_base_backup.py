@@ -201,7 +201,6 @@ class PgTests(GpTestCase):
         # Prepare mock return values
         mock_cmd_instance = mock_command.return_value
         mock_cmd_instance.get_results.return_value = None
-        mock_cmd_instance.was_successful.return_value = True
         worker_pool_mock = MagicMock()
         worker_pool_mock.join.return_value = None
         mock_worker_pool.return_value = worker_pool_mock
@@ -212,14 +211,13 @@ class PgTests(GpTestCase):
 
         # Assertions
         expected_calls = [
-            call.info('killing existing walsender process on primary sdw1:20000'),
-            call.info('killing existing walsender process on primary sdw1:20001')
+            call.info('killing existing walsender process on primary sdw1:20000 to refresh replication connection'),
+            call.info('killing existing walsender process on primary sdw1:20001 to refresh replication connection')
         ]
         mock_logger.info.assert_has_calls(expected_calls)
 
         mock_worker_pool.assert_called_with(min(batch_size, 2))
         mock_cmd_instance.get_results.assert_called_once()
-        mock_cmd_instance.was_successful.assert_called_once()
         mock_logger.warning.assert_not_called()
 
 
@@ -233,7 +231,6 @@ class PgTests(GpTestCase):
         # Prepare mock return values
         mock_cmd_instance = mock_command.return_value
         mock_cmd_instance.get_results.return_value = CommandResult(1, ''.encode(), 'error'.encode(), False, False)
-        mock_cmd_instance.was_successful.return_value = False
         worker_pool_mock = MagicMock()
         worker_pool_mock.join.return_value = None
         mock_worker_pool.return_value = worker_pool_mock
@@ -245,7 +242,6 @@ class PgTests(GpTestCase):
         # Assertions
         mock_worker_pool.assert_called_with(min(batch_size, 2))
         mock_cmd_instance.get_results.assert_called_once()
-        mock_cmd_instance.was_successful.assert_called_once()
         mock_logger.warning.assert_called_once()
         args, _ = mock_logger.warning.call_args
         assert "Unable to kill walsender on primary" in args[0]

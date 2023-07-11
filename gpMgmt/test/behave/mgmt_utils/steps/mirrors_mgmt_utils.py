@@ -109,6 +109,10 @@ def add_mirrors(context, options):
     cmd = Command('gpaddmirrors ', 'gpaddmirrors -a -i %s %s' % (context.mirror_config, options))
     cmd.run(validateAfter=True)
 
+    context.ret_code = cmd.get_results().rc
+    context.stdout_message = cmd.get_results().stdout
+    context.error_message = cmd.get_results().stderr
+
 
 def make_data_directory_called(data_directory_name):
     cdd_parent_parent = os.path.realpath(
