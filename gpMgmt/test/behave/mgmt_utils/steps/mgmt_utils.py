@@ -809,7 +809,6 @@ def impl(context, command, out_msg):
 
 
 @then('{command} should not print "{out_msg}" to stdout')
-@given('{command} should not print "{out_msg}" to stdout')
 def impl(context, command, out_msg):
     check_string_not_present_stdout(context, out_msg)
 

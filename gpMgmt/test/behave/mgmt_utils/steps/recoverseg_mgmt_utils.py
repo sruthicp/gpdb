@@ -11,7 +11,6 @@ from test.behave_utils.utils import *
 import platform, shutil
 from behave import given, when, then
 from gppylib.utils import writeLinesToFile
-import socket
 
 #TODO remove duplication of these functions
 def _get_gpAdminLogs_directory():
@@ -50,6 +49,7 @@ def impl(context, contents):
         with closing(dbconn.connect(dbconn.DbURL(), unsetSearchPath=False)) as conn:
             context.original_config_history_backout_count = dbconn.querySingleton(conn, "SELECT count(*) FROM gp_configuration_history WHERE "
                                                      "description LIKE 'gprecoverseg: segment config for backout%%';")
+
 
 
 @given('the "{seg}" segment information is saved')
@@ -188,12 +188,10 @@ def getPrimaryDbIdFromCid(context, cid):
     result = getRow('template1', dbid_from_cid_sql)
     return result[0]
 
-
 def getMirrorDbIdFromCid(context, cid):
     dbid_from_cid_sql = "SELECT dbid FROM gp_segment_configuration WHERE content=%s and role='m';" % cid
     result = getRow('template1', dbid_from_cid_sql)
     return result[0]
-
 
 def runCommandOnRemoteSegment(context, cid, sql_cmd):
     local_cmd = 'psql template1 -t -c "SELECT port,hostname FROM gp_segment_configuration WHERE content=%s and role=\'p\';"' % cid
@@ -201,10 +199,8 @@ def runCommandOnRemoteSegment(context, cid, sql_cmd):
     port, host = context.stdout_message.split("|")
     port = port.strip()
     host = host.strip()
-    psql_cmd = "PGDATABASE=\'template1\' PGOPTIONS=\'-c gp_role=utility\' psql -h %s -p %s -c \"%s\"; " % (
-    host, port, sql_cmd)
-    Command(name='Running Remote command: %s' % psql_cmd, cmdStr=psql_cmd).run(validateAfter=True)
-
+    psql_cmd = "PGDATABASE=\'template1\' PGOPTIONS=\'-c gp_role=utility\' psql -h %s -p %s -c \"%s\"; " % (host, port, sql_cmd)
+    Command(name='Running Remote command: %s' % psql_cmd, cmdStr = psql_cmd).run(validateAfter=True)
 
 @then('{utility} should print "{output}" to stdout for each {segment_type}')
 @when('{utility} should print "{output}" to stdout for each {segment_type}')
@@ -219,13 +215,12 @@ def impl(context, utility, output, segment_type):
         expected = r'\(dbid {}\): {}'.format(segment.dbid, output)
         check_stdout_msg(context, expected)
 
-
 @then('{utility} should print "{recovery_type}" errors to stdout for content {content_ids}')
 @when('{utility} should print "{recovery_type}" errors to stdout for content {content_ids}')
 def impl(context, utility, recovery_type, content_ids):
     if content_ids == "None":
         return
-    if recovery_type not in ("incremental", "full", "differential", "start"):
+    if recovery_type not in ("incremental", "full", "differential","start"):
         raise Exception("Expected recovery_type to be 'incremental', 'full' or 'start, but found '%s'." % recovery_type)
     content_list = [int(c) for c in content_ids.split(',')]
 
@@ -240,11 +235,9 @@ def impl(context, utility, recovery_type, content_ids):
                 'rewind' if recovery_type == 'incremental' else 'basebackup', segment.getSegmentDbId(), recovery_type)
         if recovery_type == 'differential':
             expected = r'hostname: {}; port: {}; logfile: {}/gpAdminLogs/rsync.\d{{8}}_\d{{6}}.dbid{}.out; recoverytype: {}'.format(
-                segment.getSegmentHostName(), segment.getSegmentPort(), os.path.expanduser("~"),
-                segment.getSegmentDbId(), recovery_type)
+                segment.getSegmentHostName(), segment.getSegmentPort(), os.path.expanduser("~"),segment.getSegmentDbId(), recovery_type)
         elif recovery_type == 'start':
-            expected = r'hostname: {}; port: {}; datadir: {}'.format(segment.getSegmentHostName(),
-                                                                     segment.getSegmentPort(),
+            expected = r'hostname: {}; port: {}; datadir: {}'.format(segment.getSegmentHostName(), segment.getSegmentPort(),
                                                                      segment.getSegmentDataDirectory())
         check_stdout_msg(context, expected)
 
@@ -305,14 +298,13 @@ def recovery_fail_check(context, recovery_type, content_ids, utility):
         print_msg = 'pg_rewind: fatal'
         logfile_name = 'pg_rewind*'
     elif recovery_type == 'full':
-        print_msg = 'pg_basebackup: error: could not access directory'  # TODO also assert for the directory location here
+        print_msg = 'pg_basebackup: error: could not access directory' #TODO also assert for the directory location here
         logfile_name = 'pg_basebackup*'
     elif recovery_type == 'differential':
         print_msg = 'rsync error:'
         logfile_name = 'rsync*'
     else:
-        raise Exception(
-            "Expected recovery_type to be 'incremental', 'full', 'differential' but found '%s'." % recovery_type)
+        raise Exception("Expected recovery_type to be 'incremental', 'full', 'differential' but found '%s'." % recovery_type)
     context.execute_steps('''
     Then gprecoverseg should return a return code of {return_code}
     And user can start transactions
@@ -363,7 +355,6 @@ def impl(context, host):
     content_id_str = ','.join(str(i) for i in content_ids_on_host)
     recovery_fail_check(context, recovery_type='full', content_ids=content_id_str)
 
-
 @then('check if moving the mirrors from {original_host} to {new_host} failed')
 def impl(context, original_host, new_host):
     all_segments = GpArray.initFromCatalog(dbconn.DbURL()).getDbList()
@@ -383,14 +374,15 @@ def impl(context, original_host, new_host):
     And gprecoverseg should not print "Segments successfully recovered" to stdout
     '''.format(content_ids=content_id_str))
 
-    # TODO add this step
-    # And gpAdminLogs directory has "pg_basebackup*" files on {new_host} only for content {content_ids}
+    #TODO add this step
+    #And gpAdminLogs directory has "pg_basebackup*" files on {new_host} only for content {content_ids}
 
     for segment in segments:
-        # TODO replace with actual port name
+        #TODO replace with actual port name
         expected = r'hostname: {}; port: \d{{5}}; logfile: {}/gpAdminLogs/pg_basebackup.\d{{8}}_\d{{6}}.dbid{}.out; ' \
                    r'recoverytype: full'.format(new_host, os.path.expanduser("~"), segment.getSegmentDbId())
         check_stdout_msg(context, expected)
+
 
 
 @then('check if start failed for full recovery for mirrors with hostname {host}')
@@ -426,7 +418,7 @@ def impl(context):
 
 @then('the "{before}" and "{after}" cluster configuration matches for gprecoverseg newhost')
 def impl(context, before, after):
-    if not hasattr(context, 'saved_array') or (before not in context.saved_array) or (after not in context.saved_array):
+    if not hasattr(context,'saved_array') or (before not in context.saved_array) or (after not in context.saved_array):
         raise Exception("before_array or after_array not saved prior to call")
 
     compare_gparray_with_expected(context.saved_array[before], context.saved_array[after])
@@ -442,8 +434,8 @@ def impl(context, before, after):
 # mirrors on new hosts.  It does not leave the cluster in its original state.
 @then('the "{before}" and "{after}" cluster configuration matches with the expected for gprecoverseg newhost')
 def impl(context, before, after):
-    if not hasattr(context, 'saved_array') or (before not in context.saved_array) or \
-        (after not in context.saved_array):
+    if not hasattr(context,'saved_array') or (before not in context.saved_array) or \
+            (after not in context.saved_array):
         raise Exception("before_array or after_array not saved prior to call")
 
     expected = {}
@@ -490,7 +482,7 @@ def impl(context, before, after):
 '''
 
     # this is the expected configuration after "gprecoverseg -p sdw5,sdw6" after "sdw1,sdw3" go down
-    expected["two_hosts_down"] = '''1|-1|p|p|n|u|mdw|mdw|5432|/data/gpdata/coordinator/gpseg-1
+    expected["two_hosts_down"] ='''1|-1|p|p|n|u|mdw|mdw|5432|/data/gpdata/coordinator/gpseg-1
 10|0|p|m|s|u|sdw2|sdw2|21000|/data/gpdata/mirror/gpseg0
 11|1|p|m|s|u|sdw2|sdw2|21001|/data/gpdata/mirror/gpseg1
 4|2|p|p|s|u|sdw2|sdw2|20000|/data/gpdata/primary/gpseg2
@@ -522,11 +514,12 @@ def impl(context, before, after):
         f.flush()
         expected_after_gparray = GpArray.initFromFile(f.name)
 
-    compare_gparray_with_expected(context.saved_array[before], expected_before_gparray, array_name=before)
+    compare_gparray_with_expected(context.saved_array[before],  expected_before_gparray, array_name=before)
     compare_gparray_with_expected(context.saved_array[after], expected_after_gparray, array_name=after)
 
 
-def compare_gparray_with_expected(actual_gparray, expected_gparray, array_name=''):
+def compare_gparray_with_expected(actual_gparray, expected_gparray, array_name = ''):
+
     def _sortedSegs(gparray):
         segs_by_host = GpArray.getSegmentsByHostName(gparray.getSegDbList())
         for host in segs_by_host:
@@ -546,13 +539,13 @@ def compare_gparray_with_expected(actual_gparray, expected_gparray, array_name='
 def impl(context, filename, content):
     line = ""
     with closing(dbconn.connect(dbconn.DbURL(dbname='template1'), unsetSearchPath=False)) as conn:
-        result = dbconn.query(conn,
-                              "SELECT port, hostname, datadir FROM gp_segment_configuration WHERE preferred_role='p' AND content = %s;" % content).fetchall()
+        result = dbconn.query(conn, "SELECT port, hostname, datadir FROM gp_segment_configuration WHERE preferred_role='p' AND content = %s;" % content).fetchall()
         port, hostname, datadir = result[0][0], result[0][1], result[0][2]
         line = "%s|%s|%s %s|%s|/tmp/newdir" % (hostname, port, datadir, hostname, port)
 
     with open("/tmp/%s" % filename, "w") as fd:
         fd.write("%s\n" % line)
+
 
 
 @given('the user waits until mirror on content {content_ids} is {expected_status}')
@@ -561,8 +554,7 @@ def impl(context, filename, content):
 def impl(context, content_ids, expected_status):
     contents = content_ids.split(',')
     for content in contents:
-        query = "SELECT gp_request_fts_probe_scan(); SELECT status FROM gp_segment_configuration where role = 'm' and content = {};".format(
-            content)
+        query = "SELECT gp_request_fts_probe_scan(); SELECT status FROM gp_segment_configuration where role = 'm' and content = {};".format(content)
         wait_for_desired_query_result(dbconn.DbURL(), query, 'u' if expected_status == 'up' else 'd')
 
 
@@ -572,13 +564,11 @@ def impl(context, contents):
     for content in contents:
         with closing(dbconn.connect(dbconn.DbURL(dbname='template1'), unsetSearchPath=False)) as conn:
             for role in [ROLE_PRIMARY, ROLE_MIRROR]:
-                actual_datadir = dbconn.querySingleton(conn,
-                                                       "SELECT datadir FROM gp_segment_configuration WHERE preferred_role='{}' AND "
-                                                       "content = {};".format(role, content))
+                actual_datadir = dbconn.querySingleton(conn, "SELECT datadir FROM gp_segment_configuration WHERE preferred_role='{}' AND "
+                                                      "content = {};".format(role, content))
                 expected_datadir = context.original_seg_info["{}_{}".format(content, role)].getSegmentDataDirectory()
                 if not expected_datadir == actual_datadir:
-                    raise Exception(
-                        "Expected datadir {}, got {} for content {}".format(expected_datadir, actual_datadir, content))
+                    raise Exception("Expected datadir {}, got {} for content {}".format(expected_datadir, actual_datadir, content))
 
 
 @given('the gprecoverseg input file "{filename}" is cleaned up')
@@ -596,7 +586,6 @@ def impl(context):
     if len(dirs) > 0:
         raise Exception("One or more backout directories exist: %s" % dirs)
 
-
 @given('the gprecoverseg lock directory is removed')
 @when('the gprecoverseg lock directory is removed')
 @then('the gprecoverseg lock directory is removed')
@@ -604,7 +593,6 @@ def impl(context):
     lock_dir = "%s/gprecoverseg.lock" % os.environ["COORDINATOR_DATA_DIRECTORY"]
     if os.path.exists(lock_dir):
         shutil.rmtree(lock_dir)
-
 
 @then('the gp_configuration_history table should contain a backout entry for the {seg} segment for contents {contents}')
 def impl(context, seg, contents):
@@ -619,26 +607,22 @@ def impl(context, seg, contents):
     contents = contents.split(',')
     for content in contents:
         with closing(dbconn.connect(dbconn.DbURL(), unsetSearchPath=False)) as conn:
-            dbid = dbconn.querySingleton(conn,
-                                         "SELECT dbid FROM gp_segment_configuration WHERE content = %s AND preferred_role = '%s'" % (
-                                         content, role))
+            dbid = dbconn.querySingleton(conn, "SELECT dbid FROM gp_segment_configuration WHERE content = %s AND preferred_role = '%s'" % (content, role))
         with closing(dbconn.connect(dbconn.DbURL(), unsetSearchPath=False)) as conn:
-            actual_tuples = dbconn.querySingleton(conn,
-                                                  "SELECT count(*) FROM gp_configuration_history WHERE dbid = %d AND description LIKE 'gprecoverseg: segment config for backout%%';" % dbid)
+            actual_tuples = dbconn.querySingleton(conn, "SELECT count(*) FROM gp_configuration_history WHERE dbid = %d AND description LIKE 'gprecoverseg: segment config for backout%%';" % dbid)
 
         original_tuples = context.original_config_history_info["{}_{}".format(content, role)]
-        if actual_tuples != original_tuples + 1:  # Running the backout script should have inserted exactly 1 entry
-            raise Exception(
-                "Expected configuration history table for dbid {} to contain {} backout entries, found {}".format
-                (dbid, original_tuples + 1, actual_tuples))
+        if actual_tuples != original_tuples + 1: # Running the backout script should have inserted exactly 1 entry
+            raise Exception("Expected configuration history table for dbid {} to contain {} backout entries, found {}".format
+                            (dbid, original_tuples + 1, actual_tuples))
 
 
 @then('the gp_configuration_history table should contain {expected_additional_entries} additional backout entries')
 def impl(context, expected_additional_entries):
     with closing(dbconn.connect(dbconn.DbURL(), unsetSearchPath=False)) as conn:
         actual_backout_entries = int(dbconn.querySingleton(conn, "SELECT count(*) FROM gp_configuration_history WHERE "
-                                                                 "description LIKE "
-                                                                 "'gprecoverseg: segment config for backout%%';"))
+                                                             "description LIKE "
+                                                             "'gprecoverseg: segment config for backout%%';"))
     expected_total_entries = int(context.original_config_history_backout_count) + int(expected_additional_entries)
     if actual_backout_entries != expected_total_entries:
         raise Exception("Expected configuration history table to have {} backout entries, found {}".format(
@@ -783,7 +767,7 @@ def impl(context, newhost, contents, oldhost):
             continue
         if contents != "all":
             for content_id in contents.split(','):
-                if seg.mirrorDB.getSegmentContentId() != content_id:
+                if seg.mirrorDB.getSegmentContentId() != int(content_id):
                     continue
                 check_entry_present(context, seg, oldhost)
         else:
@@ -793,8 +777,9 @@ def check_entry_present(context, seg, oldhost):
     for host in oldhost.split(','):
         search_ip_addr = context.host_ip_list[host]
         dbname = "template1"
-        ip_address = tuple(search_ip_addr) if len(search_ip_addr) > 1 else "('{}')".format(search_ip_addr[0])
-        query = "SELECT count(*) FROM pg_hba_file_rules WHERE database='{{replication}}' AND (address='{0}' OR address IN {1})".format(
+        ip_address = "','".join(search_ip_addr)
+        # ip_address = tuple(search_ip_addr) if len(search_ip_addr) > 1 else "('{}')".format(search_ip_addr[0])
+        query = "SELECT count(*) FROM pg_hba_file_rules WHERE database='{{replication}}' AND (address='{0}' OR address IN ('{1}'))".format(
             host, ip_address)
         phost = seg.primaryDB.getSegmentHostName()
         port = seg.primaryDB.getSegmentPort()
@@ -805,6 +790,7 @@ def check_entry_present(context, seg, oldhost):
             if result != 0:
                 raise Exception("{0} replication entry for {1}, {2} still existing in pg_hba.conf of {3}:{4}"
                                 .format(result, host, search_ip_addr,phost, port))
+
 
 @then('verify that only replication connection primary has is to {new_mirror}')
 @when('verify that only replication connection primary has is to {new_mirror}')
@@ -818,30 +804,34 @@ def impl(context, new_mirror):
 
         dbname = "template1"
         search_ip_addr = context.host_ip_list[new_mirror]
-        ip_address = tuple(search_ip_addr) if len(search_ip_addr) > 1 else "('{}')".format(search_ip_addr[0])
+        # ip_address = tuple(search_ip_addr) if len(search_ip_addr) > 1 else "('{}')".format(search_ip_addr[0])
+        ip_address = "','".join(search_ip_addr)
         query = """
-        SELECT 'old_host'  AS condition, COUNT(*) AS count
-        FROM pg_catalog.gp_stat_replication
-        WHERE client_addr NOT IN {}
-        UNION
-        SELECT 'new_host' AS condition, COUNT(*) AS count
-        FROM pg_catalog.gp_stat_replication where client_addr IN {}
-        """.format(ip_address, ip_address)
+        SELECT
+          CASE
+            WHEN
+              (SELECT COUNT(*) FROM gp_stat_replication WHERE client_addr IN ('{1}')) =
+              (SELECT COUNT(*) FROM gp_stat_replication)
+            THEN TRUE
+            ELSE FALSE
+        END;""".format(ip_address)
 
         phost = seg.primaryDB.getSegmentHostName()
         port = seg.primaryDB.getSegmentPort()
         with closing(dbconn.connect(dbconn.DbURL(dbname=dbname, port=port, hostname=phost),
                                     utility=True, unsetSearchPath=False)) as conn:
-            rows = dbconn.query(conn, query).fetchall()
-            for row in rows:
-                condition = row[0]
-                count = row[1]
-
-                if condition == 'new_host':
-                    new_host_count = count
-                elif condition == 'old_host':
-                    old_host_count = count
-            if new_host_count == 0 or old_host_count != 0:
+            # rows = dbconn.query(conn, query).fetchall()
+            # for row in rows:
+            #     condition = row[0]
+            #     count = row[1]
+            #
+            #     if condition == 'new_host':
+            #         new_host_count = count
+            #     elif condition == 'old_host':
+            #         old_host_count = count
+            # if new_host_count == 0 or old_host_count != 0:
+            result = dbconn.querySingleton(conn, query)
+            if result != 't':
                 raise Exception("{} replication connections are not updated.".format(phost))
 
 
@@ -853,3 +843,4 @@ def impl(context, host):
     for host_name in host.split(','):
         if_addrs = gp.IfAddrs.list_addrs(host_name)
         context.host_ip_list[host_name] = if_addrs
+

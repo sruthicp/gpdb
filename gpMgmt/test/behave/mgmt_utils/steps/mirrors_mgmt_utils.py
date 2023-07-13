@@ -915,16 +915,11 @@ def impl(context, old_mirror_host, new_mirror_host):
             continue
 
         mirror = seg.mirrorDB
-        valid_config = '%s|%s|%s' % (mirror.getSegmentHostName(),
-                                     mirror.getSegmentPort(),
-                                     mirror.getSegmentDataDirectory())
-        valid_config_with_different_dir = '%s|%s|%s' % (
-            new_mirror_host,
-            str(port),
-            mirror.getSegmentDataDirectory()
-        )
-        contents += '%s %s\n' % (valid_config, valid_config_with_different_dir)
+        contents += '{0}|{1}|{2} {3}|{4}|{2}\n'.format(mirror.getSegmentHostName(), mirror.getSegmentPort(),
+                                                       mirror.getSegmentDataDirectory(), new_mirror_host, str(port))
         port = port+1
     context.mirror_context.input_file = "/tmp/gpmovemirrors_input_{0}_{1}".format(old_mirror_host, new_mirror_host)
     with open(context.mirror_context.input_file_path(), 'w') as fd:
         fd.write(contents)
+
+
