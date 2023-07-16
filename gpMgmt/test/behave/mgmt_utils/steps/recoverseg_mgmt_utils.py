@@ -767,7 +767,7 @@ def impl(context, newhost, contents, oldhost):
             continue
         if contents != "all":
             for content_id in contents.split(','):
-                if seg.mirrorDB.getSegmentContentId() != content_id:
+                if seg.mirrorDB.getSegmentContentId() != int(content_id):
                     continue
                 check_entry_present(context, seg, oldhost)
         else:
@@ -777,8 +777,9 @@ def check_entry_present(context, seg, oldhost):
     for host in oldhost.split(','):
         search_ip_addr = context.host_ip_list[host]
         dbname = "template1"
-        ip_address = tuple(search_ip_addr) if len(search_ip_addr) > 1 else "('{}')".format(search_ip_addr[0])
-        query = "SELECT count(*) FROM pg_hba_file_rules WHERE database='{{replication}}' AND (address='{0}' OR address IN {1})".format(
+        ip_address = "','".join(search_ip_addr)
+        # ip_address = tuple(search_ip_addr) if len(search_ip_addr) > 1 else "('{}')".format(search_ip_addr[0])
+        query = "SELECT count(*) FROM pg_hba_file_rules WHERE database='{{replication}}' AND (address='{0}' OR address IN ('{1}'))".format(
             host, ip_address)
         phost = seg.primaryDB.getSegmentHostName()
         port = seg.primaryDB.getSegmentPort()
@@ -803,30 +804,34 @@ def impl(context, new_mirror):
 
         dbname = "template1"
         search_ip_addr = context.host_ip_list[new_mirror]
-        ip_address = tuple(search_ip_addr) if len(search_ip_addr) > 1 else "('{}')".format(search_ip_addr[0])
+        # ip_address = tuple(search_ip_addr) if len(search_ip_addr) > 1 else "('{}')".format(search_ip_addr[0])
+        ip_address = "','".join(search_ip_addr)
         query = """
-        SELECT 'old_host'  AS condition, COUNT(*) AS count
-        FROM pg_catalog.gp_stat_replication
-        WHERE client_addr NOT IN {0}
-        UNION
-        SELECT 'new_host' AS condition, COUNT(*) AS count
-        FROM pg_catalog.gp_stat_replication where client_addr IN {1}
-        """.format(ip_address, ip_address)
+        SELECT
+          CASE
+            WHEN
+              (SELECT COUNT(*) FROM gp_stat_replication WHERE client_addr IN ('{1}')) =
+              (SELECT COUNT(*) FROM gp_stat_replication)
+            THEN TRUE
+            ELSE FALSE
+        END;""".format(ip_address)
 
         phost = seg.primaryDB.getSegmentHostName()
         port = seg.primaryDB.getSegmentPort()
         with closing(dbconn.connect(dbconn.DbURL(dbname=dbname, port=port, hostname=phost),
                                     utility=True, unsetSearchPath=False)) as conn:
-            rows = dbconn.query(conn, query).fetchall()
-            for row in rows:
-                condition = row[0]
-                count = row[1]
-
-                if condition == 'new_host':
-                    new_host_count = count
-                elif condition == 'old_host':
-                    old_host_count = count
-            if new_host_count == 0 or old_host_count != 0:
+            # rows = dbconn.query(conn, query).fetchall()
+            # for row in rows:
+            #     condition = row[0]
+            #     count = row[1]
+            #
+            #     if condition == 'new_host':
+            #         new_host_count = count
+            #     elif condition == 'old_host':
+            #         old_host_count = count
+            # if new_host_count == 0 or old_host_count != 0:
+            result = dbconn.querySingleton(conn, query)
+            if result != 't':
                 raise Exception("{} replication connections are not updated.".format(phost))
 
 
