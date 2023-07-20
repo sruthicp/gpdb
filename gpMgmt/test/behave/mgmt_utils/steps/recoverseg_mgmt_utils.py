@@ -831,7 +831,7 @@ def impl(context, new_mirror):
             #         old_host_count = count
             # if new_host_count == 0 or old_host_count != 0:
             result = dbconn.querySingleton(conn, query)
-            if result != 't':
+            if result is not True:
                 raise Exception("{} replication connections are not updated.".format(phost))
 
 

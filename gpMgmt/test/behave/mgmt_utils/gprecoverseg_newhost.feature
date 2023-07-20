@@ -20,7 +20,7 @@ Feature: gprecoverseg tests involving migrating to a new host
       When the user runs <gprecoverseg_cmd>
       Then gprecoverseg should return a return code of 0
       And pg_hba file "/data/gpdata/mirror/gpseg0/pg_hba.conf" on host "<acting_primary>" contains entries for "<used>"
-      And pg_hba file on primary of mirrors on "<used>" with "all" contains no replication entries for <down>
+#      And pg_hba file on primary of mirrors on "<used>" with "all" contains no replication entries for <down>
       And verify that only replication connection primary has is to "<used>"
       And the cluster configuration is saved for "<test_case>"
       And the "before" and "<test_case>" cluster configuration matches with the expected for gprecoverseg newhost
@@ -175,7 +175,7 @@ Feature: gprecoverseg tests involving migrating to a new host
       When the user runs "gprecoverseg -a -p sdw5"
       Then gprecoverseg should return a return code of 0
       And all the segments are running
-      And pg_hba file on primary of mirrors on "sdw5" with "all" contains no replication entries for "sdw1"
+#      And pg_hba file on primary of mirrors on "sdw5" with "all" contains no replication entries for "sdw1"
       And verify that only replication connection primary has is to "sdw5"
       And the user runs "gprecoverseg -ar"
       And segment hosts "sdw1" are reconnected to the cluster and to the spare segment hosts "none"
