@@ -145,7 +145,7 @@ def update_pg_hba_on_segments(gpArray, hba_hostnames, batch_size,
 
     # killing the walsender processes on the primary segment to stop
     # any existing walsender<->walreceiver connections and to force new replication connections.
-    pg.kill_existing_walsenders_on_primary(primary_config, batch_size)
+    pg.kill_existing_walsenders_on_primary(primary_config)
 
     logger.info("Successfully modified pg_hba.conf on primary segments to allow replication connections")
 

@@ -59,15 +59,9 @@ def write_entries(out_entries, temp_hba_filename, hba_filename):
 def remove_dup_add_entries(lines, entries):
     existingLineMap = {}
     out_entries = []
-    replication_entry = "replication" in entries
-
     for line in lines:
         canonical = lineToCanonical(line)
         if canonical not in existingLineMap:
-            # check for deprecated replication entries on pg_hba.conf
-            if replication_entry and is_stale_entry(canonical):
-                continue
-
             existingLineMap[canonical] = True
             out_entries.append(line.strip())
 
@@ -78,8 +72,21 @@ def remove_dup_add_entries(lines, entries):
 
     return out_entries
 
-def is_stale_entry(line):
-    localhost_entries = ["127.0.0.1/32", "::1/128", "local"]
+def remove_stale_replication_entries(existing_hba, entries):
+    final_entries = []
+    replication_entry = "replication" in entries
+
+    for line in existing_hba:
+        # check for stale replication entries on pg_hba.conf
+        if line not in entries.split('\n'):
+            if replication_entry and is_stale_replication_entry(line):
+                continue
+        final_entries.append(line.strip())
+
+    return final_entries
+
+def is_stale_replication_entry(line):
+    localhost_entries = ["127.0.0.1/32", "::1/128", "local", "samehost"]
     # return False if line is a comment or not a replication entry
     if line.startswith('#') or "replication" not in line:
         return False
@@ -100,7 +107,8 @@ def main():
     hba_filename = options.datadir +'/pg_hba.conf'
     lines, temp_hba_filename = read_from_hba_file_and_get_empty_tempfile(hba_filename)
     out_entries = remove_dup_add_entries(lines, options.entries)
-    write_entries(out_entries, temp_hba_filename, hba_filename)
+    final_entries = remove_stale_replication_entries(out_entries, options.entries)
+    write_entries(final_entries, temp_hba_filename, hba_filename)
     run_pg_ctl_reload(options.datadir)
 
 if __name__ == "__main__":

@@ -166,34 +166,28 @@ def killPgProc(db,procname,signal):
     cmd=Kill.remote("kill "+procname,procPID,signal,hostname)
     return (parentPID,procPID)
 
-def kill_existing_walsenders_on_primary(primary_config, batch_size):
-    kill_cmds = []
+def kill_existing_walsenders_on_primary(primary_config):
+    # kill_cmds = []
     for host, port in primary_config:
+
         logger.info("killing existing walsender process on primary {0}:{1} to refresh replication connection"
                     .format(host, port))
+        # with closing(dbconn.connect(dbconn.DbURL(dbname="template1", port=20000, hostname="sdw2"),
+        #                             utility=True, unsetSearchPath=False)) as conn:
+        #     result = dbconn.query(conn, "select pg_terminate_backend(pid) as result from pg_stat_get_wal_senders();")
+        #     if result.rowcount != 0 and result.fetchone().result is True:
+        #         logger.warning("Unable to kill walsender on primary host {0}:{1}", host, port)
 
-        cmd = Command("kill existing walsender process",
-                      "ps ux | grep walsender | grep {0} | grep -v grep| awk '{{print $ 2}}'| xargs -r kill"
-                      .format(port), ctxt=REMOTE, remoteHost=host)
-        kill_cmds.append(cmd)
-
-    num_workers = min(batch_size, len(kill_cmds))
-    pool = WorkerPool(num_workers)
-    for cmd in kill_cmds:
-        pool.addCommand(cmd)
-    try:
-        pool.join()
-    except Exception as e:
-        pool.haltWork()
-        pool.joinWorkers()
-
-    for cmd in pool.getCompletedItems():
-        if not cmd.was_successful():
-            logger.warning("Unable to kill walsender on primary host {0}"
-                           .format(cmd.remoteHost))
-
-    pool.haltWork()
-    pool.joinWorkers()
+        with closing(dbconn.connect(dbconn.DbURL(dbname="template1", port=port, hostname=host), utility=True,
+                                    unsetSearchPath=False)) as conn:
+            try:
+                result = dbconn.querySingleton(conn, "select pg_terminate_backend(pid) from pg_stat_get_wal_senders();")
+                if result is False:
+                    logger.warning("Unable to kill walsender on primary host {0}:{1}", host, port)
+            except dbconn.UnexpectedRowsError:
+                # Query will return 0 rows if the primary doesn't have a walsender process running
+                # so pass this exception
+                pass
 
 class PgReplicationSlot:
     """
