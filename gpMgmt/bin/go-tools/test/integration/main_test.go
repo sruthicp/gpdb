@@ -103,7 +103,7 @@ Global Flags:
 func parseConfig(cofig_file string) (gp_config GpConfig) {
 	config, _ := os.Open(cofig_file)
 	byteValue, _ := io.ReadAll(config)
-	json.Unmarshal(byteValue, &gp_config)
+	_ = json.Unmarshal(byteValue, &gp_config)
 	return
 }
 
