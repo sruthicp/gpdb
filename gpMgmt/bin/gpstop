@@ -333,10 +333,13 @@ class GpStop:
         logger.info("Your choice was '{0}'".format(mode_selection))
         self.mode = 'fast' if mode_selection == 'f' else 'immediate'
 
-        # killing the coordinator processes stuck in shutting down state
-        logger.info("Attempting forceful termination of coordinator processes stuck in shutdown state")
-        pids = gp.get_postgres_segment_processes(self.coordinator_datadir, self.dburl.pghost)
-        unix.kill_9_segment_processes(self.coordinator_datadir, pids, self.dburl.pghost)
+        # Stop the coordinator processes stuck in shutting down state
+        logger.info("Stopping the coordinator to finish the database shutdown")
+        try:
+            cmd = gp.CoordinatorStop("stopping coordinator", self.coordinator_datadir, mode='immediate')
+            cmd.run(validateAfter=True)
+        except Exception as exc:
+            raise Exception("Unable to stop the coordinator: {0}".format(exc))
 
         # Starting the cluster in coordinator_only mode. It is required to gather segment information
         # in subsequent steps in order to continue the normal gpstop workflow.
@@ -361,11 +364,11 @@ class GpStop:
         Starting the cluster in coordinator-only mode.
         """
         logger.info("Running gpstart in coordinator_only mode.")
-        cmd = gp.GpStart("running gpstart -am", coordinatorOnly=True)
-        cmd.run(validateAfter=True)
-        if cmd.get_return_code() != 0:
-            logger.fatal("Unable to start the cluster in coordinator_only mode: {0}".format(cmd.get_stderr()))
-            sys.exit(1)
+        try:
+            cmd = gp.GpStart("running gpstart -am", coordinatorOnly=True)
+            cmd.run(validateAfter=True)
+        except Exception as exc:
+            raise Exception("Unable to start the cluster in coordinator_only mode: {0}".format(exc))
 
     class _SigIntHandler(object):
         def __init__(self):
@@ -979,5 +982,6 @@ class GpStop:
 
 if __name__ == '__main__':
     simple_main(GpStop.createParser, GpStop.createProgram, GpStop.mainOptions())
+
 
 

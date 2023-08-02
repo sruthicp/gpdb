@@ -12,7 +12,6 @@ import _thread
 import time
 from subprocess import check_output, Popen, PIPE
 import subprocess
-import multiprocessing
 from collections import defaultdict
 
 import psutil
@@ -3692,7 +3691,7 @@ def impl(context):
 @when('the user runs {command} and selects {input}')
 @then('the user runs {command} and selects {input}')
 def impl(context, command, input):
-    if input == "none":
+    if input == "no mode but presses enter":
         input = os.linesep
     p = Popen(command.split(), stdout=PIPE, stdin=PIPE, stderr=PIPE)
     stdout, stderr = p.communicate(input=input.encode())
@@ -3713,17 +3712,6 @@ def impl(context, command, input):
     p.terminate()
     p.communicate(input=input.encode())
 
-@given("a sample gpstop lock file is created")
-def impl(context):
-    process = multiprocessing.Process(target=time.sleep, args=(60,))
-    process.start()
-    lock_dir = os.path.join(os.getenv("COORDINATOR_DATA_DIRECTORY"), "gpstop.lock")
-    if not os.path.exists(lock_dir):
-        os.makedirs(lock_dir)
-    lock_file_path = os.path.join(lock_dir, "PID")
-    process_id = process.pid
-    with open(lock_file_path, "w") as file:
-        file.write(str(process_id))
 
 def are_on_different_subnets(primary_hostname, mirror_hostname):
     primary_broadcast = check_output(['ssh', '-n', primary_hostname, "/sbin/ip addr show | grep 'inet .* brd' | awk '{ print $4 }'"])
@@ -4111,3 +4099,4 @@ def impl(context, command):
     context.ret_code = p.returncode
     context.stdout_message = stdout.decode()
     context.error_message = stderr.decode()
+
