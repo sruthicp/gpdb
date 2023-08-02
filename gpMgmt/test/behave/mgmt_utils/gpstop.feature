@@ -77,7 +77,7 @@ Feature: gpstop behave tests
         And the user runs gpstop -a and selects <option>
         And gpstop should print "The database is currently in the process of shutting down." to stdout
         And gpstop should print "Your choice was '<option>'" to stdout
-        And gpstop should print "Attempting forceful termination of coordinator processes stuck in shutdown state" to stdout
+        And gpstop should print "Stopping the coordinator to finish the database shutdown" to stdout
         And gpstop should print "Running gpstart in coordinator_only mode." to stdout
         Then gpstop should return a return code of 0
         And verify no postgres process is running on all hosts
@@ -93,11 +93,10 @@ Feature: gpstop behave tests
         And the user asynchronously runs "psql postgres" and the process is saved
         And running postgres processes are saved in context
         When the user runs gpstop -a, selects s and interrupt the process
-        Then verify if the gpstop.lock directory is present in coordinator_data_directory
-        And the user runs gpstop -a and selects none
+        Then the user runs gpstop -a and selects no mode but presses enter
         And gpstop should print "The database is currently in the process of shutting down." to stdout
         And gpstop should print "Your choice was 'f'" to stdout
-        And gpstop should print "Attempting forceful termination of coordinator processes stuck in shutdown state" to stdout
+        And gpstop should print "Stopping the coordinator to finish the database shutdown" to stdout
         And gpstop should print "Running gpstart in coordinator_only mode." to stdout
         Then gpstop should return a return code of 0
         And verify no postgres process is running on all hosts
@@ -108,10 +107,9 @@ Feature: gpstop behave tests
         Given the database is running
         And the user asynchronously runs "psql postgres" and the process is saved
         When the user runs gpstop -a, selects s and interrupt the process
-        Then verify if the gpstop.lock directory is present in coordinator_data_directory
-        And the user runs <command> and selects f
+        Then the user runs <command> and selects f
         And gpstop should print "The database is currently in the process of shutting down." to stdout
-        And gpstop should print "Attempting forceful termination of coordinator processes stuck in shutdown state" to stdout
+        And gpstop should print "Stopping the coordinator to finish the database shutdown" to stdout
         And gpstop should print "Running gpstart in coordinator_only mode." to stdout
         Then gpstop should return a return code of 0
         Examples:
@@ -126,10 +124,9 @@ Feature: gpstop behave tests
         Given the database is running
         And the user asynchronously runs "psql postgres" and the process is saved
         When the user runs gpstop -a, selects s and interrupt the process
-        Then verify if the gpstop.lock directory is present in coordinator_data_directory
-        And the user runs gpstop -ar and selects f
+        Then the user runs gpstop -ar and selects f
         And gpstop should print "The database is currently in the process of shutting down." to stdout
-        And gpstop should print "Attempting forceful termination of coordinator processes stuck in shutdown state" to stdout
+        And gpstop should print "Stopping the coordinator to finish the database shutdown" to stdout
         And gpstop should print "Running gpstart in coordinator_only mode." to stdout
         Then gpstop should return a return code of 0
         # proceeding graceful shutdown of the database.
@@ -143,8 +140,7 @@ Feature: gpstop behave tests
         Given the database is running
         And the user asynchronously runs "psql postgres" and the process is saved
         When the user runs gpstop -a, selects s and interrupt the process
-        Then verify if the gpstop.lock directory is present in coordinator_data_directory
-        And the user runs "gpstop -u"
+        Then the user runs "gpstop -u"
         And gpstop should print "The database is currently in the process of shutting down." to stdout
         And gpstop should print "Cannot send SIGHUP to postmaster as the database is shutting down. Please run 'gpstop' to complete the shutdown process." to stdout
         Then gpstop should return a return code of 1
@@ -156,8 +152,9 @@ Feature: gpstop behave tests
     @demo_cluster
     Scenario: gpstop fails when the lock file is already held by another gpstop process
         Given the database is running
-        And a sample gpstop lock file is created
-        Then the user runs "gpstop -a"
+        And we run a sample background script to generate a pid on "coordinator" segment
+        Then a sample gpstop.lock directory is created using the background pid in coordinator_data_directory
+        And the user runs "gpstop -a"
         And gpstop should print "gpstop.lock indicates that an instance of gpstop is already running" to stdout
         # proceeding graceful shutdown of the database.
         And the user runs command "rm -rf $COORDINATOR_DATA_DIRECTORY/gpstop.lock"
@@ -191,5 +188,4 @@ Feature: gpstop behave tests
         # proceeding graceful shutdown of the database.
         And the user runs gpstop -a and selects f
         And gpstop should return a return code of 0
-
 
