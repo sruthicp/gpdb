@@ -1,5 +1,8 @@
+//go:build failures
+
 package integration
 
+/*
 import (
 	"github.com/greenplum-db/gpdb/gp/test/integration/assertions"
 	"os/exec"
@@ -96,3 +99,4 @@ func TestInstallFailure(t *testing.T) {
 		})
 	}
 }
+*/

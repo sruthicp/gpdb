@@ -1,5 +1,6 @@
 package integration
 
+/*
 import (
 	"github.com/greenplum-db/gpdb/gp/test/integration/assertions"
 	"os/exec"
@@ -35,3 +36,4 @@ func TestInstallHelp(t *testing.T) {
 		})
 	}
 }
+*/

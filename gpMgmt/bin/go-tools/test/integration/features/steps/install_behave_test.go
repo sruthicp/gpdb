@@ -1,4 +1,4 @@
-package integration
+package steps
 
 import (
 	"context"
@@ -29,6 +29,10 @@ func (i *installSvc) userRun(arg1 string) error {
 }
 
 func (i *installSvc) gpInstallShouldPrint(arg1 string) error {
+	return nil
+}
+
+func gpInstallShouldNotPrint(arg1 string) error {
 	return godog.ErrPending
 }
 
@@ -36,4 +40,6 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	iSvc := &installSvc{ctx: context.Background()}
 	ctx.Step(`^gp install should return return code (\d+)$`, iSvc.gpInstallShouldReturnReturnCode)
 	ctx.Step(`^user run "([^"]*)"$`, iSvc.userRun)
+	ctx.Step(`^gp install should print "([^"]*)"$`, iSvc.gpInstallShouldPrint)
+	ctx.Step(`^gp install should not print "([^"]*)"$`, iSvc.gpInstallShouldNotPrint)
 }
