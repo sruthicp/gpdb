@@ -150,14 +150,14 @@ Feature: gpstop behave tests
 
     @concourse_cluster
     @demo_cluster
-    Scenario: gpstop fails when the lock file is already held by another gpstop process
+    Scenario:
         Given the database is running
         And we run a sample background script to generate a pid on "coordinator" segment
         Then a sample gpstop.lock directory is created using the background pid in coordinator_data_directory
         And the user runs "gpstop -a"
         And gpstop should print "gpstop.lock indicates that an instance of gpstop is already running" to stdout
         # proceeding graceful shutdown of the database.
-        And the user runs command "rm -rf $COORDINATOR_DATA_DIRECTORY/gpstop.lock"
+        And the background pid is killed on "coordinator" segment
         And the user runs gpstop -a and selects f
         And gpstop should return a return code of 0
 
@@ -172,7 +172,7 @@ Feature: gpstop behave tests
         And the user runs "gpstart -a"
         And gpstart -a should return a return code of 0
         # proceeding graceful shutdown of the database.
-        And the user runs command "rm -rf $COORDINATOR_DATA_DIRECTORY/gpstop.lock"
+#        And the user runs command "rm -rf $COORDINATOR_DATA_DIRECTORY/gpstop.lock"
         And the user runs gpstop -a and selects f
         And gpstop should return a return code of 0
 
