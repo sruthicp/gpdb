@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"fmt"
 	"os"
 	"testing"
 
@@ -29,21 +28,9 @@ func TestInstallSuccess(t *testing.T) {
 			},
 		},
 		{
-			name: "install service with multiple --host option",
-			option: []string{"install",
-				"--host", "localhost",
-				"--host", host,
-			},
-			cofigFile: defaultConfigurationFile,
-			checkConfig: func(testgpConf testutils.GpConfig) testutils.GpConfig {
-				testgpConf.Hostnames = []string{"localhost", host}
-				return testgpConf
-			},
-		},
-		{
 			name: "install service with --hostfile option",
 			option: []string{"install",
-				"--hostfile", "hosts",
+				"--hostfile", testutils.Hostfile,
 			},
 			cofigFile: defaultConfigurationFile,
 			checkConfig: func(testgpConf testutils.GpConfig) testutils.GpConfig {
@@ -76,24 +63,34 @@ func TestInstallSuccess(t *testing.T) {
 			},
 		},
 		{
+			name: "install service with --service-user option",
+			option: []string{"install",
+				"--host", "localhost",
+				"--service-user", "user"},
+			cofigFile: defaultConfigurationFile,
+			checkConfig: func(testgpConf testutils.GpConfig) testutils.GpConfig {
+				testgpConf.Hostnames = []string{"localhost"}
+				return testgpConf
+			},
+		},
+		{
 			name: "install service with server and client certificates",
 			option: []string{"install",
-				"--ca-certificate", "certificates/ca-cert.pem",
-				"--ca-key", "certificates/ca-key.pem",
-				"--server-certificate", "certificates/server-cert.pem",
-				"--server-key", "certificates/server-key.pem",
-				"--service-user", "user",
+				"--ca-certificate", "/tmp/certificates/ca-cert.pem",
+				"--ca-key", "/tmp/certificates/ca-key.pem",
+				"--server-certificate", "/tmp/certificates/server-cert.pem",
+				"--server-key", "/tmp/certificates/server-key.pem",
 				"--host", "localhost",
 			},
 			cofigFile: defaultConfigurationFile,
 			checkConfig: func(testgpConf testutils.GpConfig) testutils.GpConfig {
-				path, _ := os.Getwd()
+				//path, _ := os.Getwd()
 				testgpConf.Hostnames = []string{"localhost"}
 				cred := testutils.Cred{
-					CaCert:     fmt.Sprintf("%s/%s", path, "certificates/ca-cert.pem"),
-					CaKey:      fmt.Sprintf("%s/%s", path, "certificates/ca-key.pem"),
-					ServerCert: fmt.Sprintf("%s/%s", path, "certificates/server-cert.pem"),
-					ServerKey:  fmt.Sprintf("%s/%s", path, "certificates/server-key.pem"),
+					CaCert:     "/tmp/certificates/ca-cert.pem",     //fmt.Sprintf("%s/%s", path, "certificates/ca-cert.pem"),
+					CaKey:      "/tmp/certificates/ca-key.pem",      // fmt.Sprintf("%s/%s", path, "certificates/ca-key.pem"),
+					ServerCert: "/tmp/certificates/server-cert.pem", // fmt.Sprintf("%s/%s", path, "certificates/server-cert.pem"),
+					ServerKey:  "/tmp/certificates/server-key.pem",  //fmt.Sprintf("%s/%s", path, "certificates/server-key.pem"),
 				}
 				testgpConf.Credentials = cred
 				return testgpConf

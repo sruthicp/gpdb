@@ -7,6 +7,7 @@ import (
 )
 
 func TestInstallFailure(t *testing.T) {
+	testutils.CreateHostfile([]byte(""))
 	testcases := []struct {
 		name     string
 		option   []string
@@ -16,6 +17,24 @@ func TestInstallFailure(t *testing.T) {
 		{
 			name:   "install service with empty value for --host option",
 			option: []string{"install", "--host", ""},
+			output: []string{
+				"Error creating config file: Could not copy gp.conf file to segment hosts",
+				"Could not copy gp.conf file to segment hosts",
+			},
+			exitcode: 1,
+		},
+		{
+			name:   "install service with empty file for --hostfile option",
+			option: []string{"install", "--hostfile", testutils.Hostfile},
+			output: []string{
+				"Error creating config file: Could not copy gp.conf file to segment hosts",
+				"Could not copy gp.conf file to segment hosts",
+			},
+			exitcode: 1,
+		},
+		{
+			name:   "install service with empty values for --hostfile option",
+			option: []string{"install", "--hostfile", testutils.Hostfile},
 			output: []string{
 				"Error creating config file: Could not copy gp.conf file to segment hosts",
 				"Could not copy gp.conf file to segment hosts",
@@ -56,32 +75,32 @@ func TestInstallFailure(t *testing.T) {
 			},
 			exitcode: 1,
 		},
-		//{
-		//	name: "install service with string value for --agent-port option",
-		//	option: []string{"install", "--host", "localhost",
-		//		"--agent-port", "abc"},
-		//	output: []string{
-		//		"Error creating config file: Could not copy gp.conf file to segment hosts",
-		//		"Could not copy gp.conf file to segment hosts",
-		//	},
-		//	exitcode: 1,
-		//},
-		//{
-		//	name: "install service with string value for --hub-port option",
-		//	option: []string{"install", "--host", "localhost",
-		//		"--hub-port", "abc"},
-		//	output: []string{
-		//		"Error creating config file: Could not copy gp.conf file to segment hosts",
-		//		"Could not copy gp.conf file to segment hosts",
-		//	},
-		//	exitcode: 1,
-		//},
 		{
 			name: "install service with both host and hostfile options",
 			option: []string{"install", "--host", "localhost",
 				"--hostfile", "abc"},
 			output: []string{
 				"[ERROR] if any flags in the group [host hostfile] are set none of the others can be; [host hostfile] were all set",
+			},
+			exitcode: 1,
+		},
+		{
+			name: "install service with string value for --agent-port option",
+			option: []string{"install", "--host", "localhost",
+				"--agent-port", "abc"},
+			output: []string{
+				"Error creating config file: Could not copy gp.conf file to segment hosts",
+				"Could not copy gp.conf file to segment hosts",
+			},
+			exitcode: 1,
+		},
+		{
+			name: "install service with string value for --hub-port option",
+			option: []string{"install", "--host", "localhost",
+				"--hub-port", "abc"},
+			output: []string{
+				"Error creating config file: Could not copy gp.conf file to segment hosts",
+				"Could not copy gp.conf file to segment hosts",
 			},
 			exitcode: 1,
 		},

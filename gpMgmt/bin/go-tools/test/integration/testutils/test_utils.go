@@ -25,6 +25,10 @@ type GpConfig struct {
 	Credentials Cred     `json:"Credentials"`
 }
 
+const (
+	Hostfile = "hostlist"
+)
+
 func RunInstall(option ...string) (string, int, error) {
 	cmd := exec.Command("gp", option...)
 	out, err := cmd.CombinedOutput()
@@ -56,9 +60,9 @@ func GenerateFilePath(serviceDir, serviceName, serviceExt, fileType string) stri
 }
 
 func CreateHostfile(content []byte) {
-	_ = os.WriteFile("hostlist", content, 0644)
+	_ = os.WriteFile(Hostfile, content, 0644)
 }
 
 func RemoveHostfile() {
-	_ = os.Remove("hostlist")
+	_ = os.Remove(Hostfile)
 }
