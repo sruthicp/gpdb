@@ -1,29 +1,29 @@
 package integration
 
-/*
 import (
 	"fmt"
-	"github.com/greenplum-db/gpdb/gp/test/integration/assertions"
 	"os"
-	"os/exec"
 	"testing"
+
+	"github.com/greenplum-db/gpdb/gp/test/integration/testutils"
 )
 
 func TestInstallSuccess(t *testing.T) {
 	host, _ := os.Hostname()
+	testutils.CreateHostfile([]byte(host))
 	testcases := []struct {
 		name        string
 		option      []string
 		logFile     string
 		serviceDir  string
 		cofigFile   string
-		checkConfig func(config GpConfig) GpConfig
+		checkConfig func(config testutils.GpConfig) testutils.GpConfig
 	}{
 		{
 			name:      "install service with --host option",
 			option:    []string{"install", "--host", "localhost"},
 			cofigFile: defaultConfigurationFile,
-			checkConfig: func(testgpConf GpConfig) GpConfig {
+			checkConfig: func(testgpConf testutils.GpConfig) testutils.GpConfig {
 				testgpConf.Hostnames = []string{"localhost"}
 				return testgpConf
 			},
@@ -35,8 +35,19 @@ func TestInstallSuccess(t *testing.T) {
 				"--host", host,
 			},
 			cofigFile: defaultConfigurationFile,
-			checkConfig: func(testgpConf GpConfig) GpConfig {
+			checkConfig: func(testgpConf testutils.GpConfig) testutils.GpConfig {
 				testgpConf.Hostnames = []string{"localhost", host}
+				return testgpConf
+			},
+		},
+		{
+			name: "install service with --hostfile option",
+			option: []string{"install",
+				"--hostfile", "hosts",
+			},
+			cofigFile: defaultConfigurationFile,
+			checkConfig: func(testgpConf testutils.GpConfig) testutils.GpConfig {
+				testgpConf.Hostnames = []string{host}
 				return testgpConf
 			},
 		},
@@ -46,7 +57,7 @@ func TestInstallSuccess(t *testing.T) {
 				"--host", "localhost",
 				"--agent-port", "8001"},
 			cofigFile: defaultConfigurationFile,
-			checkConfig: func(testgpConf GpConfig) GpConfig {
+			checkConfig: func(testgpConf testutils.GpConfig) testutils.GpConfig {
 				testgpConf.AgentPort = 8001
 				testgpConf.Hostnames = []string{"localhost"}
 				return testgpConf
@@ -58,7 +69,7 @@ func TestInstallSuccess(t *testing.T) {
 				"--host", "localhost",
 				"--hub-port", "8001"},
 			cofigFile: defaultConfigurationFile,
-			checkConfig: func(testgpConf GpConfig) GpConfig {
+			checkConfig: func(testgpConf testutils.GpConfig) testutils.GpConfig {
 				testgpConf.Port = 8001
 				testgpConf.Hostnames = []string{"localhost"}
 				return testgpConf
@@ -75,10 +86,10 @@ func TestInstallSuccess(t *testing.T) {
 				"--host", "localhost",
 			},
 			cofigFile: defaultConfigurationFile,
-			checkConfig: func(testgpConf GpConfig) GpConfig {
+			checkConfig: func(testgpConf testutils.GpConfig) testutils.GpConfig {
 				path, _ := os.Getwd()
 				testgpConf.Hostnames = []string{"localhost"}
-				cred := Cred{
+				cred := testutils.Cred{
 					CaCert:     fmt.Sprintf("%s/%s", path, "certificates/ca-cert.pem"),
 					CaKey:      fmt.Sprintf("%s/%s", path, "certificates/ca-key.pem"),
 					ServerCert: fmt.Sprintf("%s/%s", path, "certificates/server-cert.pem"),
@@ -95,7 +106,7 @@ func TestInstallSuccess(t *testing.T) {
 				"--verbose",
 			},
 			cofigFile: defaultConfigurationFile,
-			checkConfig: func(testgpConf GpConfig) GpConfig {
+			checkConfig: func(testgpConf testutils.GpConfig) testutils.GpConfig {
 				testgpConf.Hostnames = []string{"localhost"}
 				return testgpConf
 			},
@@ -107,7 +118,7 @@ func TestInstallSuccess(t *testing.T) {
 				"--config-file", "./gp.conf",
 			},
 			cofigFile: "./gp.conf",
-			checkConfig: func(testgpConf GpConfig) GpConfig {
+			checkConfig: func(testgpConf testutils.GpConfig) testutils.GpConfig {
 				testgpConf.Hostnames = []string{"localhost"}
 				return testgpConf
 			},
@@ -119,7 +130,7 @@ func TestInstallSuccess(t *testing.T) {
 				"--gphome", os.Getenv("GPHOME"),
 			},
 			cofigFile: defaultConfigurationFile,
-			checkConfig: func(testgpConf GpConfig) GpConfig {
+			checkConfig: func(testgpConf testutils.GpConfig) testutils.GpConfig {
 				testgpConf.Hostnames = []string{"localhost"}
 				return testgpConf
 			},
@@ -132,7 +143,7 @@ func TestInstallSuccess(t *testing.T) {
 			},
 			logFile:   "./gp_install.log",
 			cofigFile: defaultConfigurationFile,
-			checkConfig: func(testgpConf GpConfig) GpConfig {
+			checkConfig: func(testgpConf testutils.GpConfig) testutils.GpConfig {
 				testgpConf.LogDir = "."
 				testgpConf.Hostnames = []string{"localhost"}
 				return testgpConf
@@ -146,7 +157,7 @@ func TestInstallSuccess(t *testing.T) {
 			},
 			cofigFile:  defaultConfigurationFile,
 			serviceDir: "/tmp",
-			checkConfig: func(testgpConf GpConfig) GpConfig {
+			checkConfig: func(testgpConf testutils.GpConfig) testutils.GpConfig {
 				testgpConf.Hostnames = []string{"localhost"}
 				return testgpConf
 			},
@@ -158,7 +169,7 @@ func TestInstallSuccess(t *testing.T) {
 				"--service-name", "dummySvc",
 			},
 			cofigFile: defaultConfigurationFile,
-			checkConfig: func(testgpConf GpConfig) GpConfig {
+			checkConfig: func(testgpConf testutils.GpConfig) testutils.GpConfig {
 				testgpConf.Hostnames = []string{"localhost"}
 				testgpConf.ServiceName = "dummySvc"
 				return testgpConf
@@ -167,30 +178,28 @@ func TestInstallSuccess(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			cmd := exec.Command("gp", tc.option...)
-			out, err := cmd.CombinedOutput()
-			if err != nil {
-				t.Fatalf("unexpected error: %#v in test %s", err.Error(), tc.name)
-			}
-			assertions.AssertEqual(t, 0, cmd.ProcessState.ExitCode())
-			assertions.AssertContains(t, successOutput, string(out))
-			config := parseConfig(tc.cofigFile)
+			// Running the gp install command
+			out, rc, err := testutils.RunInstall(tc.option...)
+			// check for command result
+			testutils.Equal(t, nil, err)
+			testutils.Equal(t, 0, rc)
+			testutils.Contains(t, successOutput, out)
+			// check for configuration changes
+			config := testutils.ParseConfig(tc.cofigFile)
 			testConfig := defaultGPConf
-			assertions.AssertEqualValues(t, config, tc.checkConfig(testConfig))
-			if tc.logFile == "" {
-				tc.logFile = defaultLogFile
-			}
-			assertions.AssertFileExists(t, tc.logFile)
-			if tc.serviceDir == "" {
-				tc.serviceDir = defaultServiceDir
-			}
-			agentFile := fmt.Sprintf("%s/%s_agent.%s", tc.serviceDir, config.ServiceName, serviceExt)
-			hubFile := fmt.Sprintf("%s/%s_hub.%s", tc.serviceDir, config.ServiceName, serviceExt)
-			for _, file := range []string{agentFile, hubFile} {
-				assertions.AssertFileExists(t, file)
-			}
-			cleanupFiles(tc.cofigFile, tc.logFile, agentFile, hubFile)
+			testutils.EqualValues(t, config, tc.checkConfig(testConfig))
+			// check if log file is created
+			tc.logFile = testutils.SetDefault(tc.logFile, defaultLogFile)
+			testutils.FileExists(t, tc.logFile)
+
+			// check if service files are created
+			tc.serviceDir = testutils.SetDefault(tc.serviceDir, defaultServiceDir)
+			agentFile := testutils.GenerateFilePath(tc.serviceDir, config.ServiceName, serviceExt, "agent")
+			hubFile := testutils.GenerateFilePath(tc.serviceDir, config.ServiceName, serviceExt, "hub")
+			testutils.ServiceFilesExist(t, agentFile, hubFile)
+
+			// clean up files after each test cases
+			testutils.CleanupFiles(tc.cofigFile, tc.logFile, agentFile, hubFile)
 		})
 	}
 }
-*/

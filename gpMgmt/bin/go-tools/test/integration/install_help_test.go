@@ -1,10 +1,9 @@
 package integration
 
-/*
 import (
-	"github.com/greenplum-db/gpdb/gp/test/integration/assertions"
-	"os/exec"
 	"testing"
+
+	"github.com/greenplum-db/gpdb/gp/test/integration/testutils"
 )
 
 func TestInstallHelp(t *testing.T) {
@@ -26,14 +25,10 @@ func TestInstallHelp(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			cmd := exec.Command("gp", tc.option...)
-			out, err := cmd.CombinedOutput()
-			if err != nil {
-				t.Fatalf("unexpected error: %#v", err)
-			}
-			assertions.AssertEqual(t, 0, cmd.ProcessState.ExitCode())
-			assertions.AssertEqual(t, tc.expectedOut, string(out))
+			out, rc, err := testutils.RunInstall(tc.option...)
+			testutils.Equal(t, nil, err)
+			testutils.Equal(t, 0, rc)
+			testutils.Equal(t, tc.expectedOut, out)
 		})
 	}
 }
-*/

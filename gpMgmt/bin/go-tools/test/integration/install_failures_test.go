@@ -1,12 +1,9 @@
-//go:build failures
-
 package integration
 
-/*
 import (
-	"github.com/greenplum-db/gpdb/gp/test/integration/assertions"
-	"os/exec"
 	"testing"
+
+	"github.com/greenplum-db/gpdb/gp/test/integration/testutils"
 )
 
 func TestInstallFailure(t *testing.T) {
@@ -91,12 +88,10 @@ func TestInstallFailure(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			cmd := exec.Command("gp", tc.option...)
-			out, _ := cmd.CombinedOutput()
-
-			assertions.AssertEqual(t, tc.exitcode, cmd.ProcessState.ExitCode())
-			assertions.AssertContains(t, tc.output, string(out))
+			out, rc, err := testutils.RunInstall(tc.option...)
+			testutils.NotNil(t, err)
+			testutils.Equal(t, tc.exitcode, rc)
+			testutils.Contains(t, tc.output, out)
 		})
 	}
 }
-*/
