@@ -13,6 +13,7 @@ func TestInstallFailure(t *testing.T) {
 		option   []string
 		output   []string
 		exitcode int
+		//additional_testsetup func()
 	}{
 		{
 			name:   "install service with empty value for --host option",
@@ -24,6 +25,15 @@ func TestInstallFailure(t *testing.T) {
 			exitcode: 1,
 		},
 		{
+			name:   "install service with no value for --host option",
+			option: []string{"install", "--host"},
+			output: []string{
+				"Error creating config file: Could not copy gp.conf file to segment hosts",
+				"Could not copy gp.conf file to segment hosts",
+			},
+			exitcode: 2,
+		},
+		{
 			name:   "install service with empty file for --hostfile option",
 			option: []string{"install", "--hostfile", testutils.Hostfile},
 			output: []string{
@@ -33,17 +43,17 @@ func TestInstallFailure(t *testing.T) {
 			exitcode: 1,
 		},
 		{
-			name:   "install service with empty values for --hostfile option",
-			option: []string{"install", "--hostfile", testutils.Hostfile},
+			name:   "install service with no value for --hostfile option",
+			option: []string{"install", "--hostfile"},
 			output: []string{
 				"Error creating config file: Could not copy gp.conf file to segment hosts",
 				"Could not copy gp.conf file to segment hosts",
 			},
-			exitcode: 1,
+			exitcode: 2,
 		},
 		{
-			name:   "install service with invalid value for --host option",
-			option: []string{"install", "--host", "invalid"},
+			name:   "install service with non-existing host for --host option",
+			option: []string{"install", "--host", "host"},
 			output: []string{
 				"Error creating config file: Could not copy gp.conf file to segment hosts",
 				"Could not copy gp.conf file to segment hosts",
@@ -92,7 +102,7 @@ func TestInstallFailure(t *testing.T) {
 				"Error creating config file: Could not copy gp.conf file to segment hosts",
 				"Could not copy gp.conf file to segment hosts",
 			},
-			exitcode: 1,
+			exitcode: 2,
 		},
 		{
 			name: "install service with string value for --hub-port option",
@@ -101,6 +111,64 @@ func TestInstallFailure(t *testing.T) {
 			output: []string{
 				"Error creating config file: Could not copy gp.conf file to segment hosts",
 				"Could not copy gp.conf file to segment hosts",
+			},
+			exitcode: 2,
+		},
+		{
+			name: "install service with non-existing directory as service-dir value",
+			option: []string{"install",
+				"--host", "localhost",
+				"--service-dir", "/newDir/Service-dir",
+			},
+			output: []string{
+				"Could not create service directory /newDir/Service-dir on hosts",
+			},
+			exitcode: 1,
+		},
+		{
+			name: "install service with no value for service-dir option",
+			option: []string{"install",
+				"--host", "localhost",
+				"--service-dir",
+			},
+			exitcode: 2,
+		},
+		{
+			name: "install service with non-existing directory as log-dir value",
+			option: []string{"install",
+				"--host", "localhost",
+				"--log-dir", "/newDir/log_dir",
+			},
+			output: []string{
+				"no such file or directory",
+			},
+			exitcode: 2,
+		},
+		{
+			name: "install service with no value for log-dir option",
+			option: []string{"install",
+				"--host", "localhost",
+				"--log-dir",
+			},
+			output: []string{
+				"no such file or directory",
+			},
+			exitcode: 2,
+		},
+		{
+			name: "install fails when value for both --agent-port and --hub-port are same",
+			option: []string{"install",
+				"--host", "localhost",
+				"--agent-port", "2000",
+				"--hub-port", "2000",
+			},
+			exitcode: 1,
+		},
+		{
+			name: "install service fails when --gphome value is invalid",
+			option: []string{"install",
+				"--host", "localhost",
+				"--gphome", "invalid",
 			},
 			exitcode: 1,
 		},

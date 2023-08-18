@@ -9,7 +9,7 @@ import (
 
 func Equal(t *testing.T, expected, actual interface{}) bool {
 	if expected != actual {
-		t.Fatalf("Expected %#v got: %#v", expected, actual)
+		t.Fatalf("Expected %#v got: %v", expected, actual)
 	}
 	return true
 }

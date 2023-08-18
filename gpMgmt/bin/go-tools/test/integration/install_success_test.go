@@ -84,13 +84,12 @@ func TestInstallSuccess(t *testing.T) {
 			},
 			cofigFile: defaultConfigurationFile,
 			checkConfig: func(testgpConf testutils.GpConfig) testutils.GpConfig {
-				//path, _ := os.Getwd()
 				testgpConf.Hostnames = []string{"localhost"}
 				cred := testutils.Cred{
-					CaCert:     "/tmp/certificates/ca-cert.pem",     //fmt.Sprintf("%s/%s", path, "certificates/ca-cert.pem"),
-					CaKey:      "/tmp/certificates/ca-key.pem",      // fmt.Sprintf("%s/%s", path, "certificates/ca-key.pem"),
-					ServerCert: "/tmp/certificates/server-cert.pem", // fmt.Sprintf("%s/%s", path, "certificates/server-cert.pem"),
-					ServerKey:  "/tmp/certificates/server-key.pem",  //fmt.Sprintf("%s/%s", path, "certificates/server-key.pem"),
+					CaCert:     "/tmp/certificates/ca-cert.pem",
+					CaKey:      "/tmp/certificates/ca-key.pem",
+					ServerCert: "/tmp/certificates/server-cert.pem",
+					ServerKey:  "/tmp/certificates/server-key.pem",
 				}
 				testgpConf.Credentials = cred
 				return testgpConf
@@ -154,6 +153,19 @@ func TestInstallSuccess(t *testing.T) {
 			},
 			cofigFile:  defaultConfigurationFile,
 			serviceDir: "/tmp",
+			checkConfig: func(testgpConf testutils.GpConfig) testutils.GpConfig {
+				testgpConf.Hostnames = []string{"localhost"}
+				return testgpConf
+			},
+		},
+		{
+			name: "install create service directory if directory given in service-dir option doesn't exist",
+			option: []string{"install",
+				"--host", "localhost",
+				"--service-dir", "/tmp/ServiceDir",
+			},
+			cofigFile:  defaultConfigurationFile,
+			serviceDir: "/tmp/ServiceDir",
 			checkConfig: func(testgpConf testutils.GpConfig) testutils.GpConfig {
 				testgpConf.Hostnames = []string{"localhost"}
 				return testgpConf
