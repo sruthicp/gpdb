@@ -164,7 +164,7 @@ UPDATE gp_segment_configuration SET dbid=${REPLICA_PRIMARY3_DBID}, datadir='${RE
 # Restart the cluster to get the MPP parts working.
 echo "Restarting cluster now that the new cluster is properly configured..."
 export MASTER_DATA_DIRECTORY=$REPLICA_MASTER
-gpstop -ar -q
+gpstop -arv
 
 # Run validation test to confirm we have gone back in time.
 run_test gpdb_pitr_validate
