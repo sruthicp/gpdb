@@ -36,6 +36,26 @@ func (m *MockAgentClient) EXPECT() *MockAgentClientMockRecorder {
 	return m.recorder
 }
 
+// MakeSegment mocks base method.
+func (m *MockAgentClient) MakeSegment(ctx context.Context, in *idl.MakeSegmentRequest, opts ...grpc.CallOption) (*idl.MakeSegmentReply, error) {
+	m.ctrl.T.Helper()
+	varargs := []interface{}{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "MakeSegment", varargs...)
+	ret0, _ := ret[0].(*idl.MakeSegmentReply)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// MakeSegment indicates an expected call of MakeSegment.
+func (mr *MockAgentClientMockRecorder) MakeSegment(ctx, in interface{}, opts ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]interface{}{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MakeSegment", reflect.TypeOf((*MockAgentClient)(nil).MakeSegment), varargs...)
+}
+
 // Status mocks base method.
 func (m *MockAgentClient) Status(ctx context.Context, in *idl.StatusAgentRequest, opts ...grpc.CallOption) (*idl.StatusAgentReply, error) {
 	m.ctrl.T.Helper()
@@ -76,6 +96,26 @@ func (mr *MockAgentClientMockRecorder) Stop(ctx, in interface{}, opts ...interfa
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockAgentClient)(nil).Stop), varargs...)
 }
 
+// ValidateHostEnv mocks base method.
+func (m *MockAgentClient) ValidateHostEnv(ctx context.Context, in *idl.ValidateHostEnvRequest, opts ...grpc.CallOption) (*idl.ValidateHostEnvReply, error) {
+	m.ctrl.T.Helper()
+	varargs := []interface{}{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ValidateHostEnv", varargs...)
+	ret0, _ := ret[0].(*idl.ValidateHostEnvReply)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ValidateHostEnv indicates an expected call of ValidateHostEnv.
+func (mr *MockAgentClientMockRecorder) ValidateHostEnv(ctx, in interface{}, opts ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]interface{}{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidateHostEnv", reflect.TypeOf((*MockAgentClient)(nil).ValidateHostEnv), varargs...)
+}
+
 // MockAgentServer is a mock of AgentServer interface.
 type MockAgentServer struct {
 	ctrl     *gomock.Controller
@@ -97,6 +137,21 @@ func NewMockAgentServer(ctrl *gomock.Controller) *MockAgentServer {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockAgentServer) EXPECT() *MockAgentServerMockRecorder {
 	return m.recorder
+}
+
+// MakeSegment mocks base method.
+func (m *MockAgentServer) MakeSegment(arg0 context.Context, arg1 *idl.MakeSegmentRequest) (*idl.MakeSegmentReply, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MakeSegment", arg0, arg1)
+	ret0, _ := ret[0].(*idl.MakeSegmentReply)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// MakeSegment indicates an expected call of MakeSegment.
+func (mr *MockAgentServerMockRecorder) MakeSegment(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MakeSegment", reflect.TypeOf((*MockAgentServer)(nil).MakeSegment), arg0, arg1)
 }
 
 // Status mocks base method.
@@ -127,4 +182,19 @@ func (m *MockAgentServer) Stop(arg0 context.Context, arg1 *idl.StopAgentRequest)
 func (mr *MockAgentServerMockRecorder) Stop(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockAgentServer)(nil).Stop), arg0, arg1)
+}
+
+// ValidateHostEnv mocks base method.
+func (m *MockAgentServer) ValidateHostEnv(arg0 context.Context, arg1 *idl.ValidateHostEnvRequest) (*idl.ValidateHostEnvReply, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ValidateHostEnv", arg0, arg1)
+	ret0, _ := ret[0].(*idl.ValidateHostEnvReply)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ValidateHostEnv indicates an expected call of ValidateHostEnv.
+func (mr *MockAgentServerMockRecorder) ValidateHostEnv(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidateHostEnv", reflect.TypeOf((*MockAgentServer)(nil).ValidateHostEnv), arg0, arg1)
 }

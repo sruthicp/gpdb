@@ -56,6 +56,11 @@ type Server struct {
 	finish     chan struct{}
 }
 
+func (s *Server) MakeCluster(ctx context.Context, request *idl.MakeClusterRequest) (*idl.MakeClusterReply, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 type Connection struct {
 	Conn          *grpc.ClientConn
 	AgentClient   idl.AgentClient

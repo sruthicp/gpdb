@@ -31,6 +31,16 @@ type Server struct {
 	listener   net.Listener
 }
 
+func (s *Server) MakeSegment(ctx context.Context, request *idl.MakeSegmentRequest) (*idl.MakeSegmentReply, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *Server) ValidateHostEnv(ctx context.Context, request *idl.ValidateHostEnvRequest) (*idl.ValidateHostEnvReply, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func New(conf Config) *Server {
 	return &Server{
 		Config: &conf,
