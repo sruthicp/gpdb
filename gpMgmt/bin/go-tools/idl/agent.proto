@@ -47,6 +47,7 @@ message MakeSegmentRequest {
     string Encoding = 3;
     map<string, string> SegConfig = 4;
     repeated string IPList = 5;
+    bool hbaHostNames = 6;
 }
 
 message MakeSegmentReply {
