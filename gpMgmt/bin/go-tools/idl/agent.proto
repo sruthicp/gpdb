@@ -9,8 +9,18 @@ service Agent {
     rpc Stop(StopAgentRequest) returns (StopAgentReply) {}
     rpc Status(StatusAgentRequest) returns (StatusAgentReply) {}
     rpc MakeSegment(MakeSegmentRequest) returns(MakeSegmentReply) {}
+    rpc StartSegment(StartSegmentRequest) returns (StartSegmentReply){}
     rpc ValidateHostEnv(ValidateHostEnvRequest) returns(ValidateHostEnvReply) {}
 }
+
+message StartSegmentRequest{
+    string dataDir=1;
+    bool wait=2;
+    int32 timeout = 4;
+    string options=5;
+}
+
+message StartSegmentReply {}
 
 message StopAgentRequest {}
 
@@ -26,6 +36,7 @@ message StatusAgentReply {
 
 message ValidateHostEnvRequest{
     repeated string DirectoryList = 1;
+    bool forced = 2;
 }
 
 message ValidateHostEnvReply {}

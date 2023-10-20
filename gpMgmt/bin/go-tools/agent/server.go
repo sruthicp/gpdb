@@ -19,6 +19,7 @@ var (
 type Config struct {
 	Port        int
 	ServiceName string
+	GpHome      string
 
 	Credentials utils.Credentials
 }
@@ -31,14 +32,19 @@ type Server struct {
 	listener   net.Listener
 }
 
+func (s *Server) StartSegment(ctx context.Context, request *idl.StartSegmentRequest) (*idl.StartSegmentReply, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (s *Server) MakeSegment(ctx context.Context, request *idl.MakeSegmentRequest) (*idl.MakeSegmentReply, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
 func (s *Server) ValidateHostEnv(ctx context.Context, request *idl.ValidateHostEnvRequest) (*idl.ValidateHostEnvReply, error) {
-	//TODO implement me
-	panic("implement me")
+	err := s.ValidateHostEnvFn(request.DirectoryList, request.Forced)
+	return &idl.ValidateHostEnvReply{}, err
 }
 
 func New(conf Config) *Server {

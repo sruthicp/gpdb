@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/greenplum-db/gpdb/gp/common"
 	"net"
 	"os"
 	"os/exec"
@@ -58,7 +59,15 @@ type Server struct {
 
 func (s *Server) MakeCluster(ctx context.Context, request *idl.MakeClusterRequest) (*idl.MakeClusterReply, error) {
 	//TODO implement me
-	panic("implement me")
+
+	var clusterParams common.ClusterParams
+	var gparray common.GpArray
+	clusterParams.LoadFromIdl(request.ClusterParams)
+	gparray.LoadFromIdl(request.GpArray)
+
+	err := s.MakeActualCluster(gparray, clusterParams, request.ForceFlag)
+
+	return &idl.MakeClusterReply{}, err
 }
 
 type Connection struct {

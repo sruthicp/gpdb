@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"os"
 
 	"github.com/greenplum-db/gpdb/gp/hub"
@@ -101,11 +102,15 @@ func ShowAgentsStatusFunc(conf *hub.Config, skipHeader bool) error {
 		return err
 	}
 
-	reply, err := client.StatusAgents(context.Background(), &idl.StatusAgentsRequest{})
+	//reply, err := client.StatusAgents(context.Background(), &idl.StatusAgentsRequest{})
+	var clusterRequest *idl.MakeClusterRequest
+
+	reply, err := client.MakeCluster(context.Background(), clusterRequest)
 	if err != nil {
 		return err
 	}
-	Platform.DisplayServiceStatus(os.Stdout, "Agent", reply.Statuses, skipHeader)
+	//Platform.DisplayServiceStatus(os.Stdout, "Agent", reply.Statuses, skipHeader)
+	gplog.Debug("Reply:%#v", reply)
 
 	return nil
 }

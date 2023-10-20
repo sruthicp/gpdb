@@ -54,6 +54,8 @@ message Segment {
     string dataDirectory = 2;
     string hostName = 3;
     string hostAddress = 4;
+    int32 contentid = 5;
+    int32 dbid = 6;
 }
 
 message ClusterParams{
@@ -61,10 +63,9 @@ message ClusterParams{
     map<string, string> SegmentConfig = 2;
     map<string, string> CommonConfig = 3;
     Locale locale = 4;
-    repeated string CoordinatorIpList = 5;
-    bool hbaHostnames = 6;
-    string encoding = 7;
-    string suPassword = 8;
+    bool hbaHostnames = 5;
+    string encoding = 6;
+    string suPassword = 7;
 }
 
 message Locale {

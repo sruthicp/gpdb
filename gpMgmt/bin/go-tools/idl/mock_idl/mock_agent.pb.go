@@ -56,6 +56,26 @@ func (mr *MockAgentClientMockRecorder) MakeSegment(ctx, in interface{}, opts ...
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MakeSegment", reflect.TypeOf((*MockAgentClient)(nil).MakeSegment), varargs...)
 }
 
+// StartSegment mocks base method.
+func (m *MockAgentClient) StartSegment(ctx context.Context, in *idl.StartSegmentRequest, opts ...grpc.CallOption) (*idl.StartSegmentReply, error) {
+	m.ctrl.T.Helper()
+	varargs := []interface{}{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "StartSegment", varargs...)
+	ret0, _ := ret[0].(*idl.StartSegmentReply)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// StartSegment indicates an expected call of StartSegment.
+func (mr *MockAgentClientMockRecorder) StartSegment(ctx, in interface{}, opts ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]interface{}{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartSegment", reflect.TypeOf((*MockAgentClient)(nil).StartSegment), varargs...)
+}
+
 // Status mocks base method.
 func (m *MockAgentClient) Status(ctx context.Context, in *idl.StatusAgentRequest, opts ...grpc.CallOption) (*idl.StatusAgentReply, error) {
 	m.ctrl.T.Helper()
@@ -152,6 +172,21 @@ func (m *MockAgentServer) MakeSegment(arg0 context.Context, arg1 *idl.MakeSegmen
 func (mr *MockAgentServerMockRecorder) MakeSegment(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MakeSegment", reflect.TypeOf((*MockAgentServer)(nil).MakeSegment), arg0, arg1)
+}
+
+// StartSegment mocks base method.
+func (m *MockAgentServer) StartSegment(arg0 context.Context, arg1 *idl.StartSegmentRequest) (*idl.StartSegmentReply, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StartSegment", arg0, arg1)
+	ret0, _ := ret[0].(*idl.StartSegmentReply)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// StartSegment indicates an expected call of StartSegment.
+func (mr *MockAgentServerMockRecorder) StartSegment(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartSegment", reflect.TypeOf((*MockAgentServer)(nil).StartSegment), arg0, arg1)
 }
 
 // Status mocks base method.
