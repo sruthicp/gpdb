@@ -16,4 +16,5 @@ const (
 	DefaultBuffer       = "128000kB"
 	OsOpenFiles         = 65535
 	DefaultDB           = "template1"
+	ROLE_PRIMARY       = "p"
 )
