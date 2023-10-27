@@ -18,8 +18,8 @@ type ConfigureSuccessTC struct {
 	configFile       string
 	skipSvcFileCheck bool
 	verifyConfig     func(config hub.Config) hub.Config
-	IsSingleNode     bool
-	IsMultiNode      bool
+	IsSingleHost     bool
+	IsMultiHost      bool
 }
 
 // positive test cases
@@ -37,7 +37,7 @@ var ConfigureSuccessTestcases = []ConfigureSuccessTC{
 		verifyConfig: func(testgpConf hub.Config) hub.Config {
 			return testgpConf
 		},
-		IsMultiNode: true,
+		IsMultiHost: true,
 	},
 	{
 		name: "configure service with --host option",
@@ -49,23 +49,23 @@ var ConfigureSuccessTestcases = []ConfigureSuccessTC{
 			return testgpConf
 		},
 		expectedOut:  successOutput,
-		IsSingleNode: true,
+		IsSingleHost: true,
 	},
 	{
 		name:             "service configure shows help with --help",
 		cliParams:        []string{"--help"},
 		expectedOut:      helpTxt,
 		skipSvcFileCheck: true,
-		IsMultiNode:      true,
-		IsSingleNode:     true,
+		IsMultiHost:      true,
+		IsSingleHost:     true,
 	},
 	{
 		name:             "service configure shows help with -h",
 		cliParams:        []string{"-h"},
 		expectedOut:      helpTxt,
 		skipSvcFileCheck: true,
-		IsMultiNode:      true,
-		IsSingleNode:     true,
+		IsMultiHost:      true,
+		IsSingleHost:     true,
 	},
 	{
 		name: "configure service with --hostfile option",
@@ -77,8 +77,8 @@ var ConfigureSuccessTestcases = []ConfigureSuccessTC{
 		verifyConfig: func(testgpConf hub.Config) hub.Config {
 			return testgpConf
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "configure service with host and agent_port option",
@@ -91,8 +91,8 @@ var ConfigureSuccessTestcases = []ConfigureSuccessTC{
 			testgpConf.AgentPort = 8001
 			return testgpConf
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "configure service with host and hub_port option",
@@ -105,8 +105,8 @@ var ConfigureSuccessTestcases = []ConfigureSuccessTC{
 			testgpConf.Port = 8001
 			return testgpConf
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "configure service with --service-user option",
@@ -118,8 +118,8 @@ var ConfigureSuccessTestcases = []ConfigureSuccessTC{
 		verifyConfig: func(testgpConf hub.Config) hub.Config {
 			return testgpConf
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "configure service with server and client certificates",
@@ -142,8 +142,8 @@ var ConfigureSuccessTestcases = []ConfigureSuccessTC{
 			testgpConf.Credentials = cred
 			return testgpConf
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "configure service with verbose option",
@@ -156,8 +156,8 @@ var ConfigureSuccessTestcases = []ConfigureSuccessTC{
 		verifyConfig: func(testgpConf hub.Config) hub.Config {
 			return testgpConf
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "configure service with config-file option",
@@ -170,8 +170,8 @@ var ConfigureSuccessTestcases = []ConfigureSuccessTC{
 		verifyConfig: func(testgpConf hub.Config) hub.Config {
 			return testgpConf
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "configure service with changing gphome value",
@@ -184,8 +184,8 @@ var ConfigureSuccessTestcases = []ConfigureSuccessTC{
 		verifyConfig: func(testgpConf hub.Config) hub.Config {
 			return testgpConf
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "configure service with log_dir option",
@@ -200,8 +200,8 @@ var ConfigureSuccessTestcases = []ConfigureSuccessTC{
 			testgpConf.LogDir = "/tmp"
 			return testgpConf
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "configure service with service-dir option",
@@ -215,8 +215,8 @@ var ConfigureSuccessTestcases = []ConfigureSuccessTC{
 		verifyConfig: func(testgpConf hub.Config) hub.Config {
 			return testgpConf
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "configure create service directory if directory given in service-dir option doesn't exist",
@@ -230,8 +230,8 @@ var ConfigureSuccessTestcases = []ConfigureSuccessTC{
 		verifyConfig: func(testgpConf hub.Config) hub.Config {
 			return testgpConf
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "configure service with service-name option",
@@ -245,81 +245,60 @@ var ConfigureSuccessTestcases = []ConfigureSuccessTC{
 			testgpConf.ServiceName = "dummySvc"
 			return testgpConf
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 }
 
 func TestSingleHostConfigureSuccess(t *testing.T) {
-	host := testutils.DefaultHost
-	testutils.CreateHostfile([]byte(host))
-
+	testutils.CreateHostfile([]byte(testutils.DefaultHost))
 	for _, tc := range ConfigureSuccessTestcases {
-		if tc.IsSingleNode {
-			t.Run(tc.name, func(t *testing.T) {
-				runSuccessTestcases(t, tc)
-				config := testutils.ParseConfig(tc.configFile)
-				if tc.verifyConfig != nil {
-					// check for configuration changes
-					testConfig := defaultGPConf
-					testConfig.Hostnames = []string{host}
-					testutils.EqualValues(t, config, tc.verifyConfig(testConfig))
-				}
-				if !tc.skipSvcFileCheck {
-					// check if service files are created
-					tc.serviceDir = testutils.SetDefault(tc.serviceDir, defaultServiceDir)
-					agentFile := testutils.GenerateFilePath(tc.serviceDir, config.ServiceName, serviceExt, "agent")
-					hubFile := testutils.GenerateFilePath(tc.serviceDir, config.ServiceName, serviceExt, "hub")
-					testutils.ServiceFilesExist(t, tc.configFile, tc.logFile, agentFile, hubFile)
-
-					// clean up files after each test cases
-					testutils.CleanupFiles(tc.configFile, tc.logFile, agentFile, hubFile)
-				}
-			})
+		if tc.IsSingleHost {
+			runSuccessTestcases(t, tc, strings.Split(testutils.DefaultHost, "\n"))
 		}
 	}
 }
 
 func TestMultiHostConfigureSuccess(t *testing.T) {
 	testutils.CreateHostfile([]byte(testutils.MultiHosts))
-
 	for _, tc := range ConfigureSuccessTestcases {
-		if tc.IsMultiNode {
-			t.Run(tc.name, func(t *testing.T) {
-				runSuccessTestcases(t, tc)
-				config := testutils.ParseConfig(tc.configFile)
-				if tc.verifyConfig != nil {
-					// check for configuration changes
-					testConfig := defaultGPConf
-					testConfig.Hostnames = strings.Split(testutils.MultiHosts, "\n")
-					testutils.EqualValues(t, tc.verifyConfig(testConfig), config)
-				}
-				if !tc.skipSvcFileCheck {
-					// check if service files are created
-					tc.serviceDir = testutils.SetDefault(tc.serviceDir, defaultServiceDir)
-					agentFile := testutils.GenerateFilePath(tc.serviceDir, config.ServiceName, serviceExt, "agent")
-					hubFile := testutils.GenerateFilePath(tc.serviceDir, config.ServiceName, serviceExt, "hub")
-					testutils.ServiceFilesExist(t, agentFile, hubFile)
-					testutils.SvcFilesExistsOnRemoteHosts(t, agentFile, strings.Split(testutils.MultiHosts, "\n")[1:])
-
-					// clean up files after each test cases
-					testutils.CleanupFiles(tc.configFile, tc.logFile, agentFile, hubFile)
-					testutils.CleanupSvcFilesOnRemoteHosts(agentFile, strings.Split(testutils.MultiHosts, "\n")[1:])
-				}
-			})
+		if tc.IsMultiHost {
+			runSuccessTestcases(t, tc, strings.Split(testutils.MultiHosts, "\n"))
 		}
 	}
 }
 
-func runSuccessTestcases(t *testing.T, tc ConfigureSuccessTC) {
-	// Running the gp configure command
-	out, rc, err := testutils.RunConfigure(tc.cliParams...)
-	// check for command result
-	testutils.Equal(t, nil, err)
-	testutils.Equal(t, 0, rc)
-	testutils.Contains(t, tc.expectedOut, out)
+func runSuccessTestcases(t *testing.T, tc ConfigureSuccessTC, hosts []string) {
+	t.Run(tc.name, func(t *testing.T) {
+		// Running the gp configure command
+		out, rc, err := testutils.RunConfigure(tc.cliParams...)
+		// check for command result
+		testutils.Equal(t, nil, err)
+		testutils.Equal(t, 0, rc)
+		testutils.Contains(t, tc.expectedOut, out)
 
-	// check if log file is created
-	tc.logFile = testutils.SetDefault(tc.logFile, defaultLogFile)
-	testutils.FileExists(t, tc.logFile)
+		config := testutils.ParseConfig(tc.configFile)
+		if tc.verifyConfig != nil {
+			// check for configuration changes
+			testConfig := defaultGPConf
+			testConfig.Hostnames = hosts
+			testutils.EqualValues(t, tc.verifyConfig(testConfig), config)
+		}
+		if !tc.skipSvcFileCheck {
+			// check if service files are created
+			tc.serviceDir = testutils.SetDefault(tc.serviceDir, defaultServiceDir)
+			agentFile := testutils.GenerateFilePath(tc.serviceDir, config.ServiceName, serviceExt, "agent")
+			hubFile := testutils.GenerateFilePath(tc.serviceDir, config.ServiceName, serviceExt, "hub")
+			testutils.FilesExistOnHub(t, hubFile)
+			testutils.FilesExistsOnAgents(t, agentFile, hosts)
+
+			// check if log file is created
+			tc.logFile = testutils.SetDefault(tc.logFile, defaultLogFile)
+			testutils.FileExists(t, tc.logFile)
+
+			// clean up files after each test cases
+			testutils.CleanupFilesOnHub(tc.configFile, tc.logFile, hubFile)
+			testutils.CleanupFilesOnAgents(agentFile, hosts)
+		}
+	})
 }

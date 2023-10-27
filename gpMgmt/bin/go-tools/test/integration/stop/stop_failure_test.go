@@ -14,8 +14,8 @@ type StopFailTC struct {
 	expectedExitcode int
 	additionalSetup  func()
 	cleanupFunc      func()
-	isSingleNode     bool
-	isMultiNode      bool
+	isSingleHost     bool
+	isMultiHost      bool
 }
 
 var StopFailTestCases = []StopFailTC{
@@ -32,8 +32,8 @@ var StopFailTestCases = []StopFailTC{
 			_, _, _ = testutils.RunStop("hub")
 		},
 		expectedExitcode: testutils.ExitCode1,
-		isSingleNode:     true,
-		isMultiNode:      true,
+		isSingleHost:     true,
+		isMultiHost:      true,
 	},
 	{
 		name: "stop services fails when services are not running",
@@ -44,8 +44,8 @@ var StopFailTestCases = []StopFailTC{
 			"could not connect to hub",
 		},
 		expectedExitcode: testutils.ExitCode1,
-		isSingleNode:     true,
-		isMultiNode:      true,
+		isSingleHost:     true,
+		isMultiHost:      true,
 	},
 	{
 		name: "stop hub fails when hub is not running",
@@ -56,8 +56,8 @@ var StopFailTestCases = []StopFailTC{
 			"could not connect to hub",
 		},
 		expectedExitcode: testutils.ExitCode1,
-		isSingleNode:     true,
-		isMultiNode:      true,
+		isSingleHost:     true,
+		isMultiHost:      true,
 	},
 	{
 		name: "stop agents fails when services are not running",
@@ -68,8 +68,8 @@ var StopFailTestCases = []StopFailTC{
 			"could not connect to hub",
 		},
 		expectedExitcode: testutils.ExitCode1,
-		isSingleNode:     true,
-		isMultiNode:      true,
+		isSingleHost:     true,
+		isMultiHost:      true,
 	},
 	{
 		name: "stop services fails when service configuration file is not present",
@@ -88,8 +88,8 @@ var StopFailTestCases = []StopFailTC{
 			_, _, _ = testutils.RunStop("services", "--config-file", "/tmp/config.conf")
 		},
 		expectedExitcode: testutils.ExitCode1,
-		isSingleNode:     true,
-		isMultiNode:      true,
+		isSingleHost:     true,
+		isMultiHost:      true,
 	},
 	{
 		name: "stop hub fails when service configuration file is not present",
@@ -108,8 +108,8 @@ var StopFailTestCases = []StopFailTC{
 			_, _, _ = testutils.RunStop("services", "--config-file", "/tmp/config.conf")
 		},
 		expectedExitcode: testutils.ExitCode1,
-		isSingleNode:     true,
-		isMultiNode:      true,
+		isSingleHost:     true,
+		isMultiHost:      true,
 	},
 	{
 		name: "stop agents fails when service configuration file is not present",
@@ -128,8 +128,8 @@ var StopFailTestCases = []StopFailTC{
 			_, _, _ = testutils.RunStop("services", "--config-file", "/tmp/config.conf")
 		},
 		expectedExitcode: testutils.ExitCode1,
-		isSingleNode:     true,
-		isMultiNode:      true,
+		isSingleHost:     true,
+		isMultiHost:      true,
 	},
 	{
 		name: "stop services fails when certificates are not present",
@@ -147,8 +147,8 @@ var StopFailTestCases = []StopFailTC{
 			_, _, _ = testutils.RunStop("services")
 		},
 		expectedExitcode: testutils.ExitCode1,
-		isSingleNode:     true,
-		isMultiNode:      true,
+		isSingleHost:     true,
+		isMultiHost:      true,
 	},
 	{
 		name: "stop hub fails when certificates are not present",
@@ -166,8 +166,8 @@ var StopFailTestCases = []StopFailTC{
 			_, _, _ = testutils.RunStop("services")
 		},
 		expectedExitcode: testutils.ExitCode1,
-		isSingleNode:     true,
-		isMultiNode:      true,
+		isSingleHost:     true,
+		isMultiHost:      true,
 	},
 	{
 		name: "stop agents fails when certificates are not present",
@@ -185,8 +185,8 @@ var StopFailTestCases = []StopFailTC{
 			_, _, _ = testutils.RunStop("services")
 		},
 		expectedExitcode: testutils.ExitCode1,
-		isSingleNode:     true,
-		isMultiNode:      true,
+		isSingleHost:     true,
+		isMultiHost:      true,
 	},
 	{
 		name: "stop services with no value for --config-file will fail",
@@ -203,8 +203,8 @@ var StopFailTestCases = []StopFailTC{
 		cleanupFunc: func() {
 			_, _, _ = testutils.RunStop("services")
 		},
-		isSingleNode: true,
-		isMultiNode:  true,
+		isSingleHost: true,
+		isMultiHost:  true,
 	},
 	{
 		name: "stop services with non-existing file for --config-file will fail",
@@ -221,8 +221,8 @@ var StopFailTestCases = []StopFailTC{
 		cleanupFunc: func() {
 			_, _, _ = testutils.RunStop("services")
 		},
-		isSingleNode: true,
-		isMultiNode:  true,
+		isSingleHost: true,
+		isMultiHost:  true,
 	},
 	{
 		name: "stop services with empty string for --config-file will fail",
@@ -239,15 +239,15 @@ var StopFailTestCases = []StopFailTC{
 		cleanupFunc: func() {
 			_, _, _ = testutils.RunStop("services")
 		},
-		isSingleNode: true,
-		isMultiNode:  true,
+		isSingleHost: true,
+		isMultiHost:  true,
 	},
 }
 
 func TestSingleHostStopFailure(t *testing.T) {
 	testutils.CreateHostfile([]byte(testutils.DefaultHost))
 	for _, tc := range StopFailTestCases {
-		if tc.isSingleNode {
+		if tc.isSingleHost {
 			runFailureTestcases(t, tc)
 		}
 	}
@@ -256,7 +256,7 @@ func TestSingleHostStopFailure(t *testing.T) {
 func TestMultiHostStopFailure(t *testing.T) {
 	testutils.CreateHostfile([]byte(testutils.MultiHosts))
 	for _, tc := range StopFailTestCases {
-		if tc.isMultiNode {
+		if tc.isMultiHost {
 			runFailureTestcases(t, tc)
 		}
 	}

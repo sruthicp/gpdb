@@ -20,7 +20,7 @@ func TestMain(m *testing.M) {
 }
 
 func tearDownTest() {
-	testutils.CleanupFiles(testutils.Hostfile,
+	testutils.CleanupFilesOnHub(testutils.Hostfile,
 		testutils.DefaultConfigurationFile,
 		configCopy)
 }

@@ -12,8 +12,8 @@ type StartFailTC struct {
 	expectedOut      []string
 	expectedExitcode int
 	additionalSetup  func()
-	IsSingleNode     bool
-	IsMultiNode      bool
+	IsSingleHost     bool
+	IsMultiHost      bool
 }
 
 var StartFailTestCases = []StartFailTC{
@@ -30,8 +30,8 @@ var StartFailTestCases = []StartFailTC{
 		additionalSetup: func() {
 			_ = os.RemoveAll(testutils.DefaultConfigurationFile)
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "starting agents without starting hub will fail",
@@ -45,8 +45,8 @@ var StartFailTestCases = []StartFailTC{
 		additionalSetup: func() {
 			testutils.InitService(testutils.Hostfile, testutils.CertificateParams)
 		},
-		IsSingleNode: true,
-		IsMultiNode:  true,
+		IsSingleHost: true,
+		IsMultiHost:  true,
 	},
 	{
 		name: "starting hub without service file",
@@ -61,8 +61,8 @@ var StartFailTestCases = []StartFailTC{
 			testutils.InitService(testutils.Hostfile, testutils.CertificateParams)
 			testutils.DisableandDeleteServiceFiles(p)
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "starting agents without certificates",
@@ -77,8 +77,8 @@ var StartFailTestCases = []StartFailTC{
 			testutils.InitService(testutils.Hostfile, testutils.CertificateParams)
 			_ = testutils.CpCfgWithoutCertificates(configCopy)
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "starting services without ca-certificates",
@@ -93,8 +93,8 @@ var StartFailTestCases = []StartFailTC{
 				},
 				testutils.CertificateParams[4:]...)...)
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "starting services without server-certificates",
@@ -112,8 +112,8 @@ var StartFailTestCases = []StartFailTC{
 				},
 				testutils.CertificateParams[:4]...)...)
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "starting services with no value for --config-file will fail",
@@ -127,8 +127,8 @@ var StartFailTestCases = []StartFailTC{
 		additionalSetup: func() {
 			testutils.InitService(testutils.Hostfile, testutils.CertificateParams)
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "starting services with non-existing file for --config-file will fail",
@@ -142,8 +142,8 @@ var StartFailTestCases = []StartFailTC{
 		additionalSetup: func() {
 			testutils.InitService(testutils.Hostfile, testutils.CertificateParams)
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "starting services with empty string for --config-file will fail",
@@ -157,15 +157,15 @@ var StartFailTestCases = []StartFailTC{
 		additionalSetup: func() {
 			testutils.InitService(testutils.Hostfile, testutils.CertificateParams)
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 }
 
 func TestSingleHostStartFailures(t *testing.T) {
 	testutils.CreateHostfile([]byte(testutils.DefaultHost))
 	for _, tc := range StartFailTestCases {
-		if tc.IsSingleNode {
+		if tc.IsSingleHost {
 			runFailureTestcases(t, tc)
 		}
 	}
@@ -174,7 +174,7 @@ func TestSingleHostStartFailures(t *testing.T) {
 func TestMultiHostStartFailures(t *testing.T) {
 	testutils.CreateHostfile([]byte(testutils.MultiHosts))
 	for _, tc := range StartFailTestCases {
-		if tc.IsMultiNode {
+		if tc.IsMultiHost {
 			runFailureTestcases(t, tc)
 		}
 	}

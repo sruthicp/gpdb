@@ -14,8 +14,8 @@ type StopSuccessTC struct {
 	serviceName     []string
 	additionalSetup func()
 	cleanupFunc     func()
-	isSingleNode    bool
-	isMultiNode     bool
+	isSingleHost    bool
+	isMultiHost     bool
 }
 
 var StopSuccessTestCases = []StopSuccessTC{
@@ -36,8 +36,8 @@ var StopSuccessTestCases = []StopSuccessTC{
 			testutils.InitService(testutils.Hostfile, testutils.CertificateParams)
 			_, _, _ = testutils.RunStart("services")
 		},
-		isSingleNode: true,
-		isMultiNode:  true,
+		isSingleHost: true,
+		isMultiHost:  true,
 	},
 	{
 		name: "stop hub successfully",
@@ -54,8 +54,8 @@ var StopSuccessTestCases = []StopSuccessTC{
 			testutils.InitService(testutils.Hostfile, testutils.CertificateParams)
 			_, _, _ = testutils.RunStart("hub")
 		},
-		isSingleNode: true,
-		isMultiNode:  true,
+		isSingleHost: true,
+		isMultiHost:  true,
 	},
 	{
 		name: "stop agents successfully",
@@ -75,8 +75,8 @@ var StopSuccessTestCases = []StopSuccessTC{
 		cleanupFunc: func() {
 			_, _, _ = testutils.RunStop("services")
 		},
-		isSingleNode: true,
-		isMultiNode:  true,
+		isSingleHost: true,
+		isMultiHost:  true,
 	},
 	{
 		name: "stop services command with --verbose shows status details",
@@ -91,8 +91,8 @@ var StopSuccessTestCases = []StopSuccessTC{
 			testutils.InitService(testutils.Hostfile, testutils.CertificateParams)
 			_, _, _ = testutils.RunStart("services")
 		},
-		isSingleNode: true,
-		isMultiNode:  true,
+		isSingleHost: true,
+		isMultiHost:  true,
 	},
 	{
 		name: "stop hub command with --verbose shows status details",
@@ -108,8 +108,8 @@ var StopSuccessTestCases = []StopSuccessTC{
 			testutils.InitService(testutils.DefaultHost, testutils.CertificateParams)
 			_, _, _ = testutils.RunStart("hub")
 		},
-		isSingleNode: true,
-		isMultiNode:  true,
+		isSingleHost: true,
+		isMultiHost:  true,
 	},
 	{
 		name: "stop agents command with --verbose",
@@ -126,16 +126,16 @@ var StopSuccessTestCases = []StopSuccessTC{
 		cleanupFunc: func() {
 			_, _, _ = testutils.RunStop("services")
 		},
-		isSingleNode: true,
-		isMultiNode:  true,
+		isSingleHost: true,
+		isMultiHost:  true,
 	},
 	{
 		name: "stop command without params shows help",
 		expectedOut: append([]string{
 			"Stop processes",
 		}, testutils.CommonHelpText...),
-		isSingleNode: true,
-		isMultiNode:  true,
+		isSingleHost: true,
+		isMultiHost:  true,
 	},
 	{
 		name: "stop command with invalid param shows help",
@@ -145,8 +145,8 @@ var StopSuccessTestCases = []StopSuccessTC{
 		expectedOut: append([]string{
 			"Stop processes",
 		}, testutils.CommonHelpText...),
-		isSingleNode: true,
-		isMultiNode:  true,
+		isSingleHost: true,
+		isMultiHost:  true,
 	},
 	{
 		name: "stop command with --help shows help",
@@ -156,8 +156,8 @@ var StopSuccessTestCases = []StopSuccessTC{
 		expectedOut: append([]string{
 			"Stop processes",
 		}, testutils.CommonHelpText...),
-		isSingleNode: true,
-		isMultiNode:  true,
+		isSingleHost: true,
+		isMultiHost:  true,
 	},
 	{
 		name: "stop command with -h shows help",
@@ -167,8 +167,8 @@ var StopSuccessTestCases = []StopSuccessTC{
 		expectedOut: append([]string{
 			"Stop processes",
 		}, testutils.CommonHelpText...),
-		isSingleNode: true,
-		isMultiNode:  true,
+		isSingleHost: true,
+		isMultiHost:  true,
 	},
 	{
 		name: "stop hub command with --help shows help",
@@ -178,8 +178,8 @@ var StopSuccessTestCases = []StopSuccessTC{
 		expectedOut: append([]string{
 			"Stop hub",
 		}, testutils.CommonHelpText...),
-		isSingleNode: true,
-		isMultiNode:  true,
+		isSingleHost: true,
+		isMultiHost:  true,
 	},
 	{
 		name: "stop hub command with -h shows help",
@@ -189,8 +189,8 @@ var StopSuccessTestCases = []StopSuccessTC{
 		expectedOut: append([]string{
 			"Stop hub",
 		}, testutils.CommonHelpText...),
-		isSingleNode: true,
-		isMultiNode:  true,
+		isSingleHost: true,
+		isMultiHost:  true,
 	},
 	{
 		name: "stop agents command with --help shows help",
@@ -200,8 +200,8 @@ var StopSuccessTestCases = []StopSuccessTC{
 		expectedOut: append([]string{
 			"Stop agents",
 		}, testutils.CommonHelpText...),
-		isSingleNode: true,
-		isMultiNode:  true,
+		isSingleHost: true,
+		isMultiHost:  true,
 	},
 	{
 		name: "stop agents command with -h shows help",
@@ -211,8 +211,8 @@ var StopSuccessTestCases = []StopSuccessTC{
 		expectedOut: append([]string{
 			"Stop agents",
 		}, testutils.CommonHelpText...),
-		isSingleNode: true,
-		isMultiNode:  true,
+		isSingleHost: true,
+		isMultiHost:  true,
 	},
 	{
 		name: "stop services command with --help shows help",
@@ -222,8 +222,8 @@ var StopSuccessTestCases = []StopSuccessTC{
 		expectedOut: append([]string{
 			"Stop hub and agent services",
 		}, testutils.CommonHelpText...),
-		isSingleNode: true,
-		isMultiNode:  true,
+		isSingleHost: true,
+		isMultiHost:  true,
 	},
 	{
 		name: "stop services command with -h shows help",
@@ -233,23 +233,16 @@ var StopSuccessTestCases = []StopSuccessTC{
 		expectedOut: append([]string{
 			"Stop hub and agent services",
 		}, testutils.CommonHelpText...),
-		isSingleNode: true,
-		isMultiNode:  true,
+		isSingleHost: true,
+		isMultiHost:  true,
 	},
 }
 
 func TestSingleHostStopSuccess(t *testing.T) {
 	testutils.CreateHostfile([]byte(testutils.DefaultHost))
 	for _, tc := range StopSuccessTestCases {
-		if tc.isSingleNode {
-			t.Run(tc.name, func(t *testing.T) {
-				runSuccessTestcases(t, tc)
-				// check if service is not running
-				for _, svc := range tc.serviceName {
-					status, _, _ := testutils.GetSvcStatusOnHost(p.(utils.GpPlatform), svc, testutils.DefaultHost)
-					testutils.VerifySvcNotRunning(t, status)
-				}
-			})
+		if tc.isSingleHost {
+			runSuccessTestcases(t, tc, strings.Split(testutils.DefaultHost, "\n"))
 		}
 	}
 }
@@ -257,38 +250,38 @@ func TestSingleHostStopSuccess(t *testing.T) {
 func TestMultiHostStopSuccess(t *testing.T) {
 	testutils.CreateHostfile([]byte(testutils.MultiHosts))
 	for _, tc := range StopSuccessTestCases {
-		if tc.isMultiNode {
-			t.Run(tc.name, func(t *testing.T) {
-				runSuccessTestcases(t, tc)
-				// check if service is not running
-				var hostList []string
-				for _, svc := range tc.serviceName {
-					if strings.Contains(svc, "_hub") {
-						hostList = strings.Split(testutils.MultiHosts, "\n")[:1]
-					} else if strings.Contains(svc, "_agent") {
-						hostList = strings.Split(testutils.MultiHosts, "\n")
-					}
-					for _, host := range hostList {
-						status, _, _ := testutils.GetSvcStatusOnHost(p.(utils.GpPlatform), svc, host)
-						testutils.VerifySvcNotRunning(t, status)
-					}
-				}
-				if tc.cleanupFunc != nil {
-					tc.cleanupFunc()
-				}
-			})
+		if tc.isMultiHost {
+			runSuccessTestcases(t, tc, strings.Split(testutils.MultiHosts, "\n"))
 		}
 	}
 }
 
-func runSuccessTestcases(t *testing.T, tc StopSuccessTC) {
-	if tc.additionalSetup != nil {
-		tc.additionalSetup()
-	}
-	// Running the gp stop command
-	out, rc, err := testutils.RunStop(tc.cliParams...)
-	// check for command result
-	testutils.Equal(t, nil, err)
-	testutils.Equal(t, 0, rc)
-	testutils.Contains(t, tc.expectedOut, out)
+func runSuccessTestcases(t *testing.T, tc StopSuccessTC, hosts []string) {
+	t.Run(tc.name, func(t *testing.T) {
+		if tc.additionalSetup != nil {
+			tc.additionalSetup()
+		}
+		// Running the gp stop command
+		out, rc, err := testutils.RunStop(tc.cliParams...)
+		// check for command result
+		testutils.Equal(t, nil, err)
+		testutils.Equal(t, 0, rc)
+		testutils.Contains(t, tc.expectedOut, out)
+		// check if service is not running
+		var hostList []string
+		for _, svc := range tc.serviceName {
+			if strings.Contains(svc, "_hub") {
+				hostList = hosts[:1]
+			} else if strings.Contains(svc, "_agent") {
+				hostList = hosts
+			}
+			for _, host := range hostList {
+				status, _, _ := testutils.GetSvcStatusOnHost(p.(utils.GpPlatform), svc, host)
+				testutils.VerifySvcNotRunning(t, status)
+			}
+		}
+		if tc.cleanupFunc != nil {
+			tc.cleanupFunc()
+		}
+	})
 }

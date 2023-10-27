@@ -10,8 +10,8 @@ type ConfigureFailTC struct {
 	cliParams        []string
 	expectedOut      []string
 	expectedExitcode int
-	IsSigleNode      bool
-	IsMultiNode      bool
+	IsSigleHost      bool
+	IsMultiHost      bool
 }
 
 // negative test cases
@@ -23,8 +23,8 @@ var ConfigureFailTestCases = []ConfigureFailTC{
 			"please provide a valid input host name",
 		},
 		expectedExitcode: testutils.ExitCode1,
-		IsMultiNode:      true,
-		IsSigleNode:      true,
+		IsMultiHost:      true,
+		IsSigleHost:      true,
 	},
 	{
 		name:      "configure service with no value for --host option",
@@ -33,8 +33,8 @@ var ConfigureFailTestCases = []ConfigureFailTC{
 			"flag needs an argument: --host",
 		},
 		expectedExitcode: testutils.ExitCode1,
-		IsMultiNode:      true,
-		IsSigleNode:      true,
+		IsMultiHost:      true,
+		IsSigleHost:      true,
 	},
 	{
 		name:      "configure service with empty file for --hostfile option",
@@ -43,8 +43,8 @@ var ConfigureFailTestCases = []ConfigureFailTC{
 			"expected at least one host or hostlist specified",
 		},
 		expectedExitcode: testutils.ExitCode1,
-		IsMultiNode:      true,
-		IsSigleNode:      true,
+		IsMultiHost:      true,
+		IsSigleHost:      true,
 	},
 	{
 		name:      "configure service with no value for --hostfile option",
@@ -53,8 +53,8 @@ var ConfigureFailTestCases = []ConfigureFailTC{
 			"flag needs an argument: --hostfile",
 		},
 		expectedExitcode: testutils.ExitCode1,
-		IsMultiNode:      true,
-		IsSigleNode:      true,
+		IsMultiHost:      true,
+		IsSigleHost:      true,
 	},
 	{
 		name:      "configure service with non-existing host for --host option",
@@ -63,8 +63,8 @@ var ConfigureFailTestCases = []ConfigureFailTC{
 			"could not copy gp.conf file to segment hosts",
 		},
 		expectedExitcode: testutils.ExitCode1,
-		IsMultiNode:      true,
-		IsSigleNode:      true,
+		IsMultiHost:      true,
+		IsSigleHost:      true,
 	},
 	{
 		name:      "configure service with one valid host and invalid host for --host option",
@@ -73,8 +73,8 @@ var ConfigureFailTestCases = []ConfigureFailTC{
 			"could not copy gp.conf file to segment hosts",
 		},
 		expectedExitcode: testutils.ExitCode1,
-		IsMultiNode:      true,
-		IsSigleNode:      true,
+		IsMultiHost:      true,
+		IsSigleHost:      true,
 	},
 	{
 		name: "configure service without any option",
@@ -82,8 +82,8 @@ var ConfigureFailTestCases = []ConfigureFailTC{
 			"at least one hostname must be provided using either --host or --hostfile",
 		},
 		expectedExitcode: testutils.ExitCode1,
-		IsMultiNode:      true,
-		IsSigleNode:      true,
+		IsMultiHost:      true,
+		IsSigleHost:      true,
 	},
 	{
 		name:      "configure service with invalid option",
@@ -92,8 +92,8 @@ var ConfigureFailTestCases = []ConfigureFailTC{
 			"unknown flag: --invalid",
 		},
 		expectedExitcode: testutils.ExitCode1,
-		IsMultiNode:      true,
-		IsSigleNode:      true,
+		IsMultiHost:      true,
+		IsSigleHost:      true,
 	},
 	{
 		name: "configure service with both host and hostfile options",
@@ -103,8 +103,8 @@ var ConfigureFailTestCases = []ConfigureFailTC{
 			"[ERROR] if any flags in the group [host hostfile] are set none of the others can be; [host hostfile] were all set",
 		},
 		expectedExitcode: testutils.ExitCode1,
-		IsMultiNode:      true,
-		IsSigleNode:      true,
+		IsMultiHost:      true,
+		IsSigleHost:      true,
 	},
 	{
 		name: "configure service with string value for --agent-port option",
@@ -114,8 +114,8 @@ var ConfigureFailTestCases = []ConfigureFailTC{
 			"invalid argument",
 		},
 		expectedExitcode: testutils.ExitCode1,
-		IsMultiNode:      true,
-		IsSigleNode:      true,
+		IsMultiHost:      true,
+		IsSigleHost:      true,
 	},
 	{
 		name: "configure service with string value for --hub-port option",
@@ -125,8 +125,8 @@ var ConfigureFailTestCases = []ConfigureFailTC{
 			"invalid argument",
 		},
 		expectedExitcode: testutils.ExitCode1,
-		IsMultiNode:      true,
-		IsSigleNode:      true,
+		IsMultiHost:      true,
+		IsSigleHost:      true,
 	},
 	{
 		name: "configure service with no value for --agent-port option",
@@ -136,8 +136,8 @@ var ConfigureFailTestCases = []ConfigureFailTC{
 			"flag needs an argument: --agent-port",
 		},
 		expectedExitcode: testutils.ExitCode1,
-		IsMultiNode:      true,
-		IsSigleNode:      true,
+		IsMultiHost:      true,
+		IsSigleHost:      true,
 	},
 	{
 		name: "configure service with no value for --hub-port option",
@@ -147,8 +147,8 @@ var ConfigureFailTestCases = []ConfigureFailTC{
 			"flag needs an argument: --hub-port",
 		},
 		expectedExitcode: testutils.ExitCode1,
-		IsMultiNode:      true,
-		IsSigleNode:      true,
+		IsMultiHost:      true,
+		IsSigleHost:      true,
 	},
 	{
 		name: "configure service with non-existing directory as service-dir value",
@@ -160,8 +160,8 @@ var ConfigureFailTestCases = []ConfigureFailTC{
 			"could not create service directory /newDir/Service-dir on hosts",
 		},
 		expectedExitcode: testutils.ExitCode1,
-		IsMultiNode:      true,
-		IsSigleNode:      true,
+		IsMultiHost:      true,
+		IsSigleHost:      true,
 	},
 	{
 		name: "configure service with no value for service-dir option",
@@ -173,8 +173,8 @@ var ConfigureFailTestCases = []ConfigureFailTC{
 			"flag needs an argument: --service-dir",
 		},
 		expectedExitcode: testutils.ExitCode1,
-		IsMultiNode:      true,
-		IsSigleNode:      true,
+		IsMultiHost:      true,
+		IsSigleHost:      true,
 	},
 	{
 		name: "configure service with non-existing directory as log-dir value",
@@ -186,8 +186,8 @@ var ConfigureFailTestCases = []ConfigureFailTC{
 			"no such file or directory",
 		},
 		expectedExitcode: testutils.ExitCode1,
-		IsMultiNode:      true,
-		IsSigleNode:      true,
+		IsMultiHost:      true,
+		IsSigleHost:      true,
 	},
 	{
 		name: "configure service with no value for log-dir option",
@@ -197,8 +197,8 @@ var ConfigureFailTestCases = []ConfigureFailTC{
 		},
 		// TODO: Add expected output here. Skipped it for now as the test case results in a panic error.
 		expectedExitcode: testutils.ExitCode1,
-		IsMultiNode:      true,
-		IsSigleNode:      true,
+		IsMultiHost:      true,
+		IsSigleHost:      true,
 	},
 	{
 		name: "configure fails when value for both --agent-port and --hub-port are same",
@@ -209,8 +209,8 @@ var ConfigureFailTestCases = []ConfigureFailTC{
 		},
 		// TODO: Add expected output here. Currently this case is not returning error.
 		expectedExitcode: testutils.ExitCode1,
-		IsMultiNode:      true,
-		IsSigleNode:      true,
+		IsMultiHost:      true,
+		IsSigleHost:      true,
 	},
 	{
 		name: "configure service fails when --gphome value is invalid",
@@ -222,8 +222,8 @@ var ConfigureFailTestCases = []ConfigureFailTC{
 			"could not create configuration file invalid/gp.conf",
 		},
 		expectedExitcode: testutils.ExitCode1,
-		IsMultiNode:      true,
-		IsSigleNode:      true,
+		IsMultiHost:      true,
+		IsSigleHost:      true,
 	},
 	{
 		name: "configure service fails when --gphome value is empty",
@@ -235,8 +235,8 @@ var ConfigureFailTestCases = []ConfigureFailTC{
 			"not a valid gphome found",
 		},
 		expectedExitcode: testutils.ExitCode1,
-		IsMultiNode:      true,
-		IsSigleNode:      true,
+		IsMultiHost:      true,
+		IsSigleHost:      true,
 	},
 	{
 		name: "configure service fails when no value given for --gphome",
@@ -248,8 +248,8 @@ var ConfigureFailTestCases = []ConfigureFailTC{
 			"flag needs an argument: --gphome",
 		},
 		expectedExitcode: testutils.ExitCode1,
-		IsMultiNode:      true,
-		IsSigleNode:      true,
+		IsMultiHost:      true,
+		IsSigleHost:      true,
 	},
 	{
 		name: "configure fails when non-existing service user is given",
@@ -260,24 +260,22 @@ var ConfigureFailTestCases = []ConfigureFailTC{
 			"could not create service directory",
 		},
 		expectedExitcode: testutils.ExitCode1,
-		IsMultiNode:      true,
-		IsSigleNode:      true,
+		IsMultiHost:      true,
+		IsSigleHost:      true,
 	},
 }
 
 func TestSingleHostConfigureFailure(t *testing.T) {
-	testutils.CreateHostfile([]byte(""))
 	for _, tc := range ConfigureFailTestCases {
-		if tc.IsSigleNode {
+		if tc.IsSigleHost {
 			runFailureTestcases(t, tc)
 		}
 	}
 }
 
 func TestMultiHostConfigureFailure(t *testing.T) {
-	testutils.CreateHostfile([]byte(""))
 	for _, tc := range ConfigureFailTestCases {
-		if tc.IsMultiNode {
+		if tc.IsMultiHost {
 			runFailureTestcases(t, tc)
 		}
 	}
@@ -285,6 +283,7 @@ func TestMultiHostConfigureFailure(t *testing.T) {
 
 func runFailureTestcases(t *testing.T, tc ConfigureFailTC) {
 	t.Run(tc.name, func(t *testing.T) {
+		testutils.CreateHostfile([]byte(""))
 		out, rc, err := testutils.RunConfigure(tc.cliParams...)
 		testutils.NotNil(t, err)
 		testutils.Equal(t, tc.expectedExitcode, rc)

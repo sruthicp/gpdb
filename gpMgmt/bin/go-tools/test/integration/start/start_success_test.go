@@ -17,8 +17,8 @@ type StartSuccessTC struct {
 	serviceName     []string
 	additionalSetup func()
 	cleanup         func()
-	IsSingleNode    bool
-	IsMultiNode     bool
+	IsSingleHost    bool
+	IsMultiHost     bool
 }
 
 var StartSuccessTestCases = []StartSuccessTC{
@@ -37,8 +37,8 @@ var StartSuccessTestCases = []StartSuccessTC{
 		cleanup: func() {
 			_, _, _ = testutils.RunStop("hub")
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "start hub and agents successfully",
@@ -56,8 +56,8 @@ var StartSuccessTestCases = []StartSuccessTC{
 		cleanup: func() {
 			_, _, _ = testutils.RunStop("services")
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "start hub after gp configure with --service-name param",
@@ -80,8 +80,8 @@ var StartSuccessTestCases = []StartSuccessTC{
 		cleanup: func() {
 			_, _, _ = testutils.RunStop("services")
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "start command with invalid params shows help",
@@ -91,16 +91,16 @@ var StartSuccessTestCases = []StartSuccessTC{
 		expectedOut: append([]string{
 			"Start hub, agents services",
 		}, testutils.CommonHelpText...),
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "start command without additional cli params shows help",
 		expectedOut: append([]string{
 			"Start hub, agents services",
 		}, testutils.CommonHelpText...),
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "start command with --help params shows help",
@@ -110,8 +110,8 @@ var StartSuccessTestCases = []StartSuccessTC{
 		expectedOut: append([]string{
 			"Start hub, agents services",
 		}, testutils.CommonHelpText...),
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "start command with -h params shows help",
@@ -121,8 +121,8 @@ var StartSuccessTestCases = []StartSuccessTC{
 		expectedOut: append([]string{
 			"Start hub, agents services",
 		}, testutils.CommonHelpText...),
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "start hub with -h params shows help",
@@ -141,8 +141,8 @@ var StartSuccessTestCases = []StartSuccessTC{
 		expectedOut: append([]string{
 			"Start the hub",
 		}, testutils.CommonHelpText...),
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "start agents with -h params shows help",
@@ -152,8 +152,8 @@ var StartSuccessTestCases = []StartSuccessTC{
 		expectedOut: append([]string{
 			"Start the agents",
 		}, testutils.CommonHelpText...),
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "start agents with --help params shows help",
@@ -163,8 +163,8 @@ var StartSuccessTestCases = []StartSuccessTC{
 		expectedOut: append([]string{
 			"Start the agents",
 		}, testutils.CommonHelpText...),
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "start services with -h params shows help",
@@ -174,8 +174,8 @@ var StartSuccessTestCases = []StartSuccessTC{
 		expectedOut: append([]string{
 			"Start hub and agent services",
 		}, testutils.CommonHelpText...),
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "start services with --help params shows help",
@@ -185,8 +185,8 @@ var StartSuccessTestCases = []StartSuccessTC{
 		expectedOut: append([]string{
 			"Start hub and agent services",
 		}, testutils.CommonHelpText...),
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "start services with --verbose param shows sevice status",
@@ -197,8 +197,8 @@ var StartSuccessTestCases = []StartSuccessTC{
 		additionalSetup: func() {
 			testutils.InitService(testutils.Hostfile, testutils.CertificateParams)
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 		expectedOut: []string{
 			"[INFO] Hub gp started successfully",
 			"[INFO] Agents gp started successfully",
@@ -217,8 +217,8 @@ var StartSuccessTestCases = []StartSuccessTC{
 		additionalSetup: func() {
 			testutils.InitService(testutils.Hostfile, testutils.CertificateParams)
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 		expectedOut: []string{
 			"[INFO] Hub gp started successfully",
 			"Hub", "running",
@@ -232,26 +232,8 @@ var StartSuccessTestCases = []StartSuccessTC{
 func TestSingleHostStartSuccess(t *testing.T) {
 	testutils.CreateHostfile([]byte(testutils.DefaultHost))
 	for _, tc := range StartSuccessTestCases {
-		if tc.IsSingleNode {
-			t.Run(tc.name, func(t *testing.T) {
-				var listeningPort int
-				runSuccessTestcases(t, tc)
-				gpCfg = testutils.ParseConfig(testutils.DefaultConfigurationFile)
-
-				// check if service is running
-				for _, svc := range tc.serviceName {
-					if strings.Contains(svc, "_hub") {
-						listeningPort = gpCfg.Port
-					} else if strings.Contains(svc, "_agent") {
-						listeningPort = gpCfg.AgentPort
-					}
-					status, _, _ := testutils.GetSvcStatusOnHost(p.(utils.GpPlatform), svc, testutils.DefaultHost)
-					testutils.VerifyServicePIDOnPort(t, status, listeningPort, testutils.DefaultHost)
-				}
-				if tc.cleanup != nil {
-					tc.cleanup()
-				}
-			})
+		if tc.IsSingleHost {
+			runSuccessTestcases(t, tc, strings.Split(testutils.DefaultHost, "\n"))
 		}
 	}
 }
@@ -259,43 +241,44 @@ func TestSingleHostStartSuccess(t *testing.T) {
 func TestMultiHostStartSuccess(t *testing.T) {
 	testutils.CreateHostfile([]byte(testutils.MultiHosts))
 	for _, tc := range StartSuccessTestCases {
-		if tc.IsMultiNode {
-			t.Run(tc.name, func(t *testing.T) {
-				var listeningPort int
-				runSuccessTestcases(t, tc)
-				gpCfg = testutils.ParseConfig(testutils.DefaultConfigurationFile)
-
-				// check if service is running
-				for _, svc := range tc.serviceName {
-					hostList := make([]string, 0)
-					if strings.Contains(svc, "_hub") {
-						listeningPort = gpCfg.Port
-						hostList = strings.Split(testutils.MultiHosts, "\n")[:1]
-					} else if strings.Contains(svc, "_agent") {
-						listeningPort = gpCfg.AgentPort
-						hostList = strings.Split(testutils.MultiHosts, "\n")
-					}
-					for _, host := range hostList {
-						status, _, _ := testutils.GetSvcStatusOnHost(p.(utils.GpPlatform), svc, host)
-						testutils.VerifyServicePIDOnPort(t, status, listeningPort, host)
-					}
-				}
-				if tc.cleanup != nil {
-					tc.cleanup()
-				}
-			})
+		if tc.IsMultiHost {
+			runSuccessTestcases(t, tc, strings.Split(testutils.MultiHosts, "\n"))
 		}
 	}
 }
 
-func runSuccessTestcases(t *testing.T, tc StartSuccessTC) {
-	if tc.additionalSetup != nil {
-		tc.additionalSetup()
-	}
-	// Running the gp start command
-	out, rc, err := testutils.RunStart(tc.cliParams...)
-	// check for command result
-	testutils.Equal(t, nil, err)
-	testutils.Equal(t, 0, rc)
-	testutils.Contains(t, tc.expectedOut, out)
+func runSuccessTestcases(t *testing.T, tc StartSuccessTC, hosts []string) {
+	t.Run(tc.name, func(t *testing.T) {
+		var listeningPort int
+		if tc.additionalSetup != nil {
+			tc.additionalSetup()
+		}
+		// Running the gp start command
+		out, rc, err := testutils.RunStart(tc.cliParams...)
+		// check for command result
+		testutils.Equal(t, nil, err)
+		testutils.Equal(t, 0, rc)
+		testutils.Contains(t, tc.expectedOut, out)
+
+		gpCfg = testutils.ParseConfig(testutils.DefaultConfigurationFile)
+
+		// check if service is running
+		for _, svc := range tc.serviceName {
+			hostList := make([]string, 0)
+			if strings.Contains(svc, "_hub") {
+				listeningPort = gpCfg.Port
+				hostList = hosts[:1]
+			} else if strings.Contains(svc, "_agent") {
+				listeningPort = gpCfg.AgentPort
+				hostList = hosts
+			}
+			for _, host := range hostList {
+				status, _, _ := testutils.GetSvcStatusOnHost(p.(utils.GpPlatform), svc, host)
+				testutils.VerifyServicePIDOnPort(t, status, listeningPort, host)
+			}
+		}
+		if tc.cleanup != nil {
+			tc.cleanup()
+		}
+	})
 }

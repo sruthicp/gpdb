@@ -82,19 +82,17 @@ func SetDefault(value, defaultValue string) string {
 	return value
 }
 
-func CleanupFiles(files ...string) {
+func CleanupFilesOnHub(files ...string) {
 	for _, f := range files {
 		_ = os.RemoveAll(f)
 	}
 }
 
-func CleanupSvcFilesOnRemoteHosts(file string, hosts []string) {
-	genCmd := Command{
-		cmdStr: fmt.Sprintf("rm -rf %s && echo $?", file),
-	}
+func CleanupFilesOnAgents(file string, hosts []string) {
+	cmdStr := fmt.Sprintf("/bin/bash -c 'rm -rf %s && echo $?'", file)
 	for _, host := range hosts {
-		genCmd.host = host
-		_, _, _ = runCmd(genCmd)
+		cmd := exec.Command("ssh", host, cmdStr)
+		_, _ = cmd.CombinedOutput()
 	}
 }
 
@@ -104,12 +102,6 @@ func GenerateFilePath(serviceDir, serviceName, serviceExt, fileType string) stri
 
 func CreateHostfile(content []byte) {
 	_ = os.WriteFile(Hostfile, content, 0644)
-}
-
-func GetRootDir() string {
-	currentDir, _ := os.Getwd()
-	relativeParentPath := "../../.."
-	return filepath.Join(currentDir, relativeParentPath)
 }
 
 func CpCfgWithoutCertificates(name string) error {

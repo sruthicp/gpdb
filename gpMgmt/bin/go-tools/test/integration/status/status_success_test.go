@@ -16,8 +16,8 @@ type StatusSuccessTC struct {
 	serviceName     []string
 	additionalSetup func()
 	cleanupFunc     func()
-	IsSingleNode    bool
-	IsMultiNode     bool
+	IsSingleHost    bool
+	IsMultiHost     bool
 }
 
 var StatusSuccessTestCases = []StatusSuccessTC{
@@ -42,8 +42,8 @@ var StatusSuccessTestCases = []StatusSuccessTC{
 		cleanupFunc: func() {
 			_, _, _ = testutils.RunStop("services")
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "status hub shows status of hub when it is not running",
@@ -57,8 +57,8 @@ var StatusSuccessTestCases = []StatusSuccessTC{
 		additionalSetup: func() {
 			testutils.InitService(testutils.Hostfile, testutils.CertificateParams)
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "status hub shows status of hub",
@@ -79,8 +79,8 @@ var StatusSuccessTestCases = []StatusSuccessTC{
 		cleanupFunc: func() {
 			_, _, _ = testutils.RunStop("services")
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "status agents shows status of agents",
@@ -101,16 +101,16 @@ var StatusSuccessTestCases = []StatusSuccessTC{
 		cleanupFunc: func() {
 			_, _, _ = testutils.RunStop("services")
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "status command without params shows help",
 		expectedOut: append([]string{
 			"Display status",
 		}, testutils.CommonHelpText...),
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "status command with invalid param shows help",
@@ -120,8 +120,8 @@ var StatusSuccessTestCases = []StatusSuccessTC{
 		expectedOut: append([]string{
 			"Display status",
 		}, testutils.CommonHelpText...),
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "status command with --help shows help",
@@ -131,8 +131,8 @@ var StatusSuccessTestCases = []StatusSuccessTC{
 		expectedOut: append([]string{
 			"Display status",
 		}, testutils.CommonHelpText...),
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "status command with -h shows help",
@@ -142,8 +142,8 @@ var StatusSuccessTestCases = []StatusSuccessTC{
 		expectedOut: append([]string{
 			"Display status",
 		}, testutils.CommonHelpText...),
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "status hub command with --help shows help",
@@ -153,8 +153,8 @@ var StatusSuccessTestCases = []StatusSuccessTC{
 		expectedOut: append([]string{
 			"Display hub status",
 		}, testutils.CommonHelpText...),
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "status hub command with -h shows help",
@@ -164,8 +164,8 @@ var StatusSuccessTestCases = []StatusSuccessTC{
 		expectedOut: append([]string{
 			"Display hub status",
 		}, testutils.CommonHelpText...),
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "status agents command with --help shows help",
@@ -175,8 +175,8 @@ var StatusSuccessTestCases = []StatusSuccessTC{
 		expectedOut: append([]string{
 			"Display agents status",
 		}, testutils.CommonHelpText...),
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "status agents command with -h shows help",
@@ -186,8 +186,8 @@ var StatusSuccessTestCases = []StatusSuccessTC{
 		expectedOut: append([]string{
 			"Display agents status",
 		}, testutils.CommonHelpText...),
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "status services command with --help shows help",
@@ -197,8 +197,8 @@ var StatusSuccessTestCases = []StatusSuccessTC{
 		expectedOut: append([]string{
 			"Display Hub and Agent services status",
 		}, testutils.CommonHelpText...),
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "status services command with -h shows help",
@@ -208,8 +208,8 @@ var StatusSuccessTestCases = []StatusSuccessTC{
 		expectedOut: append([]string{
 			"Display Hub and Agent services status",
 		}, testutils.CommonHelpText...),
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "status services with --verbose cli param",
@@ -232,8 +232,8 @@ var StatusSuccessTestCases = []StatusSuccessTC{
 		cleanupFunc: func() {
 			_, _, _ = testutils.RunStop("services")
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "status hub with --verbose cli param",
@@ -254,8 +254,8 @@ var StatusSuccessTestCases = []StatusSuccessTC{
 		cleanupFunc: func() {
 			_, _, _ = testutils.RunStop("services")
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "status agents with --verbose cli param",
@@ -276,8 +276,8 @@ var StatusSuccessTestCases = []StatusSuccessTC{
 		cleanupFunc: func() {
 			_, _, _ = testutils.RunStop("services")
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "status services when gp installed with --service-name param",
@@ -301,15 +301,15 @@ var StatusSuccessTestCases = []StatusSuccessTC{
 		cleanupFunc: func() {
 			_, _, _ = testutils.RunStop("services")
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 }
 
 func TestSingleHostStatusSuccess(t *testing.T) {
 	testutils.CreateHostfile([]byte(testutils.DefaultHost))
 	for _, tc := range StatusSuccessTestCases {
-		if tc.IsSingleNode {
+		if tc.IsSingleHost {
 			runSuccessTestcases(t, tc)
 		}
 	}
@@ -318,7 +318,7 @@ func TestSingleHostStatusSuccess(t *testing.T) {
 func TestMultiHostStatusSuccess(t *testing.T) {
 	testutils.CreateHostfile([]byte(testutils.MultiHosts))
 	for _, tc := range StatusSuccessTestCases {
-		if tc.IsMultiNode {
+		if tc.IsMultiHost {
 			runSuccessTestcases(t, tc)
 		}
 	}

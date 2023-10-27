@@ -13,8 +13,8 @@ type StatusFailTC struct {
 	expectedExitcode int
 	additionalSetup  func()
 	cleanupFunc      func()
-	IsSingleNode     bool
-	IsMultiNode      bool
+	IsSingleHost     bool
+	IsMultiHost      bool
 }
 
 var StatusFailTestCases = []StatusFailTC{
@@ -36,8 +36,8 @@ var StatusFailTestCases = []StatusFailTC{
 		cleanupFunc: func() {
 			_, _, _ = testutils.RunStop("services", "--config-file", "/tmp/config.conf")
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "checking status of agents will fail if hub is not running",
@@ -51,8 +51,8 @@ var StatusFailTestCases = []StatusFailTC{
 		additionalSetup: func() {
 			testutils.InitService(testutils.Hostfile, testutils.CertificateParams)
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "checking status of services after stopping hub will fail",
@@ -67,8 +67,8 @@ var StatusFailTestCases = []StatusFailTC{
 		additionalSetup: func() {
 			testutils.InitService(testutils.Hostfile, testutils.CertificateParams)
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "checking status of agents without certificates",
@@ -87,8 +87,8 @@ var StatusFailTestCases = []StatusFailTC{
 		cleanupFunc: func() {
 			_, _, _ = testutils.RunStop("services")
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "checking status of services without certificates",
@@ -107,8 +107,8 @@ var StatusFailTestCases = []StatusFailTC{
 		cleanupFunc: func() {
 			_, _, _ = testutils.RunStop("services")
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "checking service status with no value for --config-file will fail",
@@ -126,8 +126,8 @@ var StatusFailTestCases = []StatusFailTC{
 		cleanupFunc: func() {
 			_, _, _ = testutils.RunStop("services")
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "checking service status with non-existing file for --config-file will fail",
@@ -145,8 +145,8 @@ var StatusFailTestCases = []StatusFailTC{
 		cleanupFunc: func() {
 			_, _, _ = testutils.RunStop("services")
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 	{
 		name: "checking service status with empty string for --config-file will fail",
@@ -164,15 +164,15 @@ var StatusFailTestCases = []StatusFailTC{
 		cleanupFunc: func() {
 			_, _, _ = testutils.RunStop("services")
 		},
-		IsMultiNode:  true,
-		IsSingleNode: true,
+		IsMultiHost:  true,
+		IsSingleHost: true,
 	},
 }
 
 func TestSingleHostStatusFailures(t *testing.T) {
 	testutils.CreateHostfile([]byte(testutils.DefaultHost))
 	for _, tc := range StatusFailTestCases {
-		if tc.IsSingleNode {
+		if tc.IsSingleHost {
 			runFailureTestcases(t, tc)
 		}
 	}
@@ -181,7 +181,7 @@ func TestSingleHostStatusFailures(t *testing.T) {
 func TestMultiHostStatusFailures(t *testing.T) {
 	testutils.CreateHostfile([]byte(testutils.MultiHosts))
 	for _, tc := range StatusFailTestCases {
-		if tc.IsMultiNode {
+		if tc.IsMultiHost {
 			runFailureTestcases(t, tc)
 		}
 	}

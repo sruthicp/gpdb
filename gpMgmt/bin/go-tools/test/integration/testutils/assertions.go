@@ -3,6 +3,7 @@ package testutils
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"reflect"
 	"strconv"
 	"strings"
@@ -53,21 +54,40 @@ func FileExists(t *testing.T, file string) bool {
 	return true
 }
 
-func SvcFilesExistsOnRemoteHosts(t *testing.T, file string, hosts []string) bool {
-	genCmd := Command{
-		cmdStr: fmt.Sprintf("test -e %s && echo $?", file),
-	}
+//	func SvcFilesExistsOnRemoteHosts(t *testing.T, file string, hosts []string) bool {
+//		genCmd := Command{
+//			cmdStr: fmt.Sprintf("test -e %s && echo $?", file),
+//		}
+//		for _, host := range hosts {
+//			genCmd.host = host
+//			out, _, _ := runCmd(genCmd)
+//			if strings.TrimSpace(out) != "0" {
+//				t.Errorf("File %s not found on %s", file, host)
+//			}
+//		}
+//		return true
+//	}
+func FilesExistsOnAgents(t *testing.T, file string, hosts []string) bool {
+	cmdStr := fmt.Sprintf("/bin/bash -c 'test -e %s && echo $?'", file)
 	for _, host := range hosts {
-		genCmd.host = host
-		out, _, _ := runCmd(genCmd)
-		if strings.TrimSpace(out) != "0" {
+		cmd := exec.Command("ssh", host, cmdStr)
+		out, _ := cmd.CombinedOutput()
+		if strings.TrimSpace(string(out)) != "0" {
 			t.Errorf("File %s not found on %s", file, host)
 		}
 	}
+
 	return true
 }
 
-func ServiceFilesExist(t *testing.T, files ...string) bool {
+//func ServiceFilesExist(t *testing.T, files ...string) bool {
+//	for _, file := range files {
+//		return FileExists(t, file)
+//	}
+//	return false
+//}
+
+func FilesExistOnHub(t *testing.T, files ...string) bool {
 	for _, file := range files {
 		return FileExists(t, file)
 	}
