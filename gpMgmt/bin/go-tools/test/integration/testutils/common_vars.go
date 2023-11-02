@@ -8,7 +8,6 @@ import (
 var (
 	GpHome                   = os.Getenv("GPHOME")
 	DefaultHost              = "localhost"
-	MultiHosts               = "cdw\nsdw1\nsdw2\nsdw3"
 	DefaultConfigurationFile = fmt.Sprintf("%s/gp.conf", GpHome)
 	CertificateParams        = []string{
 		"--ca-certificate", "/tmp/certificates/ca-cert.pem",

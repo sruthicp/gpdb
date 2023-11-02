@@ -1,6 +1,7 @@
 package configure
 
 import (
+	"flag"
 	"fmt"
 	"github.com/greenplum-db/gpdb/gp/constants"
 	"github.com/greenplum-db/gpdb/gp/hub"
@@ -9,6 +10,11 @@ import (
 	"os"
 	"testing"
 )
+
+type TestCase struct {
+	cliParams   []string
+	expectedOut []string
+}
 
 const (
 	defaultLogFile = "/tmp/gp_configure.log"
@@ -32,6 +38,8 @@ var (
 		"Flags:",
 		"Global Flags:",
 	}
+	mockHostFile = "hostlist"
+	hostfile     = flag.String("hostfile", "", "file containing list of hosts")
 )
 
 func init() {
@@ -57,6 +65,12 @@ func init() {
 
 // TestMain function to run tests and perform cleanup at the end.
 func TestMain(m *testing.M) {
+	flag.Parse()
+	// if hostfile is not provided as input argument, create it with default host
+	if *hostfile == "" {
+		*hostfile = "/tmp/hostlist"
+		_ = os.WriteFile(*hostfile, []byte(testutils.DefaultHost), 0644)
+	}
 	exitVal := m.Run()
 	tearDownTest()
 
@@ -64,6 +78,6 @@ func TestMain(m *testing.M) {
 }
 
 func tearDownTest() {
-	testutils.CleanupFilesOnHub(testutils.Hostfile,
+	testutils.CleanupFilesOnHub(mockHostFile,
 		fmt.Sprintf("%s/%s", testutils.GpHome, constants.ConfigFileName))
 }
