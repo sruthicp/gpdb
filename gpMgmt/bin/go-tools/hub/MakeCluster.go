@@ -2,14 +2,20 @@ package hub
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sync"
+
+	"golang.org/x/exp/maps"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/greenplum-db/gpdb/gp/common"
 	"github.com/greenplum-db/gpdb/gp/errorlist"
 	"github.com/greenplum-db/gpdb/gp/idl"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-	"sync"
+	"github.com/greenplum-db/gpdb/gp/utils"
+	"github.com/greenplum-db/gpdb/gp/utils/greenplum"
 )
 
 func (s *Server) MakeActualCluster(gparray common.GpArray, params common.ClusterParams, forced bool) error {
@@ -111,4 +117,151 @@ func (s *Server) ValidateOnHost(hostname string, credentials credentials.Transpo
 		return err
 	}
 	return nil
+}
+
+func CreateSingleSegment(conn *Connection, seg *idl.Segment, clusterParams *idl.ClusterParams, addressList []string) error {
+	pgConfig := make(map[string]string)
+	maps.Copy(pgConfig, clusterParams.CommonConfig)
+	if seg.Contentid == -1 {
+		maps.Copy(pgConfig, clusterParams.CoordinatorConfig)
+	} else {
+		maps.Copy(pgConfig, clusterParams.SegmentConfig)
+	}
+
+	makeSegmentReq := &idl.MakeSegmentRequest{
+		Segment: seg,
+		Locale: clusterParams.Locale,
+		Encoding: clusterParams.Encoding,
+		SegConfig: pgConfig,
+		IPList: addressList,
+		HbaHostNames: clusterParams.HbaHostnames,
+	}
+
+	_, err := conn.AgentClient.MakeSegment(context.Background(), makeSegmentReq)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func CreateAndStartCoordinator(conns []*Connection, seg *idl.Segment, clusterParams *idl.ClusterParams) error {
+	coordinatorConn := getConnByHost(conns, []string{seg.HostName})
+
+	seg.Contentid = -1
+	seg.Dbid = 1
+	request := func(conn *Connection) error {
+		err := CreateSingleSegment(conn, seg, clusterParams, []string{})
+		if err != nil {
+			return err
+		}
+
+		startSegReq := &idl.StartSegmentRequest{
+			DataDir: seg.DataDirectory,
+			Wait: true,
+			Options: "-c gp_role=utility",
+		}
+		_, err = conn.AgentClient.StartSegment(context.Background(), startSegReq)
+
+		return err
+	}
+
+	return ExecuteRPC(coordinatorConn, request)
+}
+
+func CreateSegments(conns []*Connection, segs []greenplum.Segment, clusterParams *idl.ClusterParams, addressList []string) error {
+	hostSegmentMap := map[string][]*idl.Segment{}
+	for _, seg := range segs {
+		segReq := &idl.Segment{
+			Port: int32(seg.Port),
+			DataDirectory: seg.DataDirectory,
+			HostName: seg.HostName,
+			HostAddress: seg.HostAddress,
+			Contentid: int32(seg.ContentId),
+			Dbid: int32(seg.Dbid),
+		}
+
+		if _, ok := hostSegmentMap[seg.HostName]; !ok {
+			hostSegmentMap[seg.HostName] = []*idl.Segment{segReq}
+		} else {
+			hostSegmentMap[seg.HostName] = append(hostSegmentMap[seg.HostName], segReq)
+		}
+	}
+
+	request := func(conn *Connection) error {
+		var wg sync.WaitGroup
+
+		segs := hostSegmentMap[conn.Hostname]
+		errs := make(chan error, len(segs))
+		for _, seg := range segs {
+			seg := seg
+			wg.Add(1)
+			go func(seg *idl.Segment) {
+				defer wg.Done()
+
+				err := CreateSingleSegment(conn, seg, clusterParams, addressList)
+				if err != nil {
+					errs <- utils.FormatGrpcError(err)
+				}
+			}(seg)
+		}
+
+		wg.Wait()
+		close(errs)
+
+		var err error
+		for e := range errs {
+			err = errors.Join(err, e)
+		}
+		return err
+	}
+
+	return ExecuteRPC(conns, request)
+}
+
+func StartSegments(conns []*Connection, segs []greenplum.Segment, options string) error {
+	hostSegmentMap := map[string][]greenplum.Segment{}
+	for _, seg := range segs {
+		if _, ok := hostSegmentMap[seg.HostName]; !ok {
+			hostSegmentMap[seg.HostName] = []greenplum.Segment{seg}
+		} else {
+			hostSegmentMap[seg.HostName] = append(hostSegmentMap[seg.HostName], seg)
+		}
+	}
+
+	request := func(conn *Connection) error {
+		var wg sync.WaitGroup
+
+		segs := hostSegmentMap[conn.Hostname]
+		errs := make(chan error, len(segs))
+		for _, seg := range segs {
+			seg := seg
+			startReq := &idl.StartSegmentRequest{
+				DataDir: seg.DataDirectory,
+				Wait: true,
+				Timeout: 600,
+				Options: options,
+			}
+			wg.Add(1)
+			go func(seg greenplum.Segment) {
+				defer wg.Done()
+
+				_, err := conn.AgentClient.StartSegment(context.Background(), startReq)
+				if err != nil {
+					errs <- utils.FormatGrpcError(err)
+				}
+			}(seg)
+		}
+
+		wg.Wait()
+		close(errs)
+
+		var err error
+		for e := range errs {
+			err = errors.Join(err, e)
+		}
+		return err
+	}
+
+	return ExecuteRPC(conns, request)
 }

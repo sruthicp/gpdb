@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/greenplum-db/gpdb/gp/common"
 	"net"
 	"os"
 	"os/exec"
@@ -13,17 +12,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/greenplum-db/gpdb/gp/constants"
-
-	"github.com/greenplum-db/gp-common-go-libs/gplog"
-	"github.com/greenplum-db/gpdb/gp/idl"
-	"github.com/greenplum-db/gpdb/gp/testutils/exectest"
-	"github.com/greenplum-db/gpdb/gp/utils"
+	"golang.org/x/exp/slices"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/reflection"
 	grpcStatus "google.golang.org/grpc/status"
+
+	"github.com/greenplum-db/gp-common-go-libs/gplog"
+	"github.com/greenplum-db/gpdb/gp/common"
+	"github.com/greenplum-db/gpdb/gp/constants"
+	"github.com/greenplum-db/gpdb/gp/idl"
+	"github.com/greenplum-db/gpdb/gp/testutils/exectest"
+	"github.com/greenplum-db/gpdb/gp/utils"
+	"github.com/greenplum-db/gpdb/gp/utils/greenplum"
 )
 
 var (
@@ -66,6 +68,32 @@ func (s *Server) MakeCluster(ctx context.Context, request *idl.MakeClusterReques
 	gparray.LoadFromIdl(request.GpArray)
 
 	err := s.MakeActualCluster(gparray, clusterParams, request.ForceFlag)
+
+	err = CreateAndStartCoordinator(s.Conns, request.GpArray.Coordinator, request.ClusterParams)
+	if err != nil {
+		return &idl.MakeClusterReply{}, err
+	}
+
+	greenplum.RegisterCoordinator(request.GpArray.Coordinator)
+	greenplum.RegisterPrimaries(request.GpArray.Primaries, request.GpArray.Coordinator.HostName, int(request.GpArray.Coordinator.Port))
+
+	gpArray := greenplum.NewGpArray()
+	err = gpArray.ReadGpSegmentConfig(request.GpArray.Coordinator.HostName, int(request.GpArray.Coordinator.Port))
+	if err != nil {
+		return &idl.MakeClusterReply{}, err
+	}
+
+	primarySegs, err := gpArray.GetPrimarySegments()
+	if err != nil {
+		return &idl.MakeClusterReply{}, err
+	}
+
+	err = CreateSegments(s.Conns, primarySegs, request.ClusterParams, []string{})
+	if err != nil {
+		return &idl.MakeClusterReply{}, err
+	}
+
+	err = StartSegments(s.Conns, primarySegs, "-c gp_role=utility")
 
 	return &idl.MakeClusterReply{}, err
 }
@@ -403,6 +431,17 @@ func copyConfigFileToAgents(conf *Config, ConfigFilePath string) error {
 	}
 
 	return nil
+}
+
+func getConnByHost(conns []*Connection, hostnames []string) []*Connection {
+	result := []*Connection{}
+	for _, conn := range conns {
+		if slices.Contains(hostnames, conn.Hostname) {
+			result = append(result, conn)
+		}
+	}
+
+	return result
 }
 
 // used only for testing

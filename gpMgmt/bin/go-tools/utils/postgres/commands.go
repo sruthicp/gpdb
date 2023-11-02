@@ -26,14 +26,14 @@ func NewPgCommand(pgCmd PgCommand, gphome string) *exec.Cmd {
 func RunPgCommand(pgCmd PgCommand, gphome string) (*bytes.Buffer, error) {
 	stdout := new(bytes.Buffer)
     stderr := new(bytes.Buffer)
-	
+
 	cmd := NewPgCommand(pgCmd, gphome)
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 
-	gplog.Debug("Executing command: %s", cmd.String())	
+	gplog.Debug("Executing command: %s", cmd.String())
 	err := cmd.Run()
-	
+
 	if err != nil {
 		return stderr, err
 	} else {
@@ -41,7 +41,6 @@ func RunPgCommand(pgCmd PgCommand, gphome string) (*bytes.Buffer, error) {
 	}
 }
 
-// Initdb represents the initdb command configuration.
 type Initdb struct {
 	PgData         string
 	Encoding       string
@@ -54,28 +53,28 @@ type Initdb struct {
 	LcTime         string
 	SharedBuffers  string
 	MaxConnections int
+	DataChecksums   bool
 }
 
-// GetCmd returns an exec.Cmd for the initdb command.
 func (cmd *Initdb) buildPgCommand(gphome string) *exec.Cmd {
-	utility := getGphomeUtilityPath(gphome, initdbUtility)
+	utility := GetGphomeUtilityPath(gphome, initdbUtility)
 	args := []string{}
 
-	args = appendIfNotEmpty(args, "--pgdata", cmd.PgData)
-	args = appendIfNotEmpty(args, "--encoding", cmd.Encoding)
-	args = appendIfNotEmpty(args, "--lc-collate", cmd.LcCollate)
-	args = appendIfNotEmpty(args, "--lc-ctype", cmd.LcCtype)
-	args = appendIfNotEmpty(args, "--lc-messages", cmd.LcMessages)
-	args = appendIfNotEmpty(args, "--lc-monetary", cmd.LcMonetory)
-	args = appendIfNotEmpty(args, "--lc-numeric", cmd.LcNumeric)
-	args = appendIfNotEmpty(args, "--lc-time", cmd.LcTime)
-	args = appendIfNotEmpty(args, "--max_connections", cmd.MaxConnections)
-	args = appendIfNotEmpty(args, "--shared_buffers", cmd.SharedBuffers)
+	args = AppendIfNotEmpty(args, "--pgdata", cmd.PgData)
+	args = AppendIfNotEmpty(args, "--encoding", cmd.Encoding)
+	args = AppendIfNotEmpty(args, "--lc-collate", cmd.LcCollate)
+	args = AppendIfNotEmpty(args, "--lc-ctype", cmd.LcCtype)
+	args = AppendIfNotEmpty(args, "--lc-messages", cmd.LcMessages)
+	args = AppendIfNotEmpty(args, "--lc-monetary", cmd.LcMonetory)
+	args = AppendIfNotEmpty(args, "--lc-numeric", cmd.LcNumeric)
+	args = AppendIfNotEmpty(args, "--lc-time", cmd.LcTime)
+	args = AppendIfNotEmpty(args, "--max_connections", cmd.MaxConnections)
+	args = AppendIfNotEmpty(args, "--shared_buffers", cmd.SharedBuffers)
+	args = AppendIfNotEmpty(args, "--data-checksums", cmd.DataChecksums)
 
 	return utils.System.ExecCommand(utility, args...)
 }
 
-// PgCtlStart represents the pg_ctl start command configuration.
 type PgCtlStart struct {
 	PgData  string
 	Timeout int
@@ -86,27 +85,26 @@ type PgCtlStart struct {
 	Mode    string
 }
 
-// GetCmd returns an exec.Cmd for the pg_ctl start command.
 func (cmd *PgCtlStart) buildPgCommand(gphome string) *exec.Cmd {
-	utility := getGphomeUtilityPath(gphome, pgCtlUtility)
+	utility := GetGphomeUtilityPath(gphome, pgCtlUtility)
 	args := []string{"start"}
 
-	args = appendIfNotEmpty(args, "--pgdata", cmd.PgData)
-	args = appendIfNotEmpty(args, "--timeout", cmd.Timeout)
-	args = appendIfNotEmpty(args, "--wait", cmd.Wait)
-	args = appendIfNotEmpty(args, "--no-wait", cmd.NoWait)
-	args = appendIfNotEmpty(args, "--log", cmd.Logfile)
-	args = appendIfNotEmpty(args, "--options", cmd.Options)
-	args = appendIfNotEmpty(args, "--mode", cmd.Mode)
+	args = AppendIfNotEmpty(args, "--pgdata", cmd.PgData)
+	args = AppendIfNotEmpty(args, "--timeout", cmd.Timeout)
+	args = AppendIfNotEmpty(args, "--wait", cmd.Wait)
+	args = AppendIfNotEmpty(args, "--no-wait", cmd.NoWait)
+	args = AppendIfNotEmpty(args, "--log", cmd.Logfile)
+	args = AppendIfNotEmpty(args, "--options", cmd.Options)
+	args = AppendIfNotEmpty(args, "--mode", cmd.Mode)
 
 	return utils.System.ExecCommand(utility, args...)
 }
 
-func getGphomeUtilityPath(gphome, utility string) string {
+func GetGphomeUtilityPath(gphome, utility string) string {
 	return path.Join(gphome, "bin", utility)
 }
 
-func appendIfNotEmpty(args []string, flag string, value interface{}) []string {
+func AppendIfNotEmpty(args []string, flag string, value interface{}) []string {
 	switch value := value.(type) {
 	case int:
 		if value != 0 {

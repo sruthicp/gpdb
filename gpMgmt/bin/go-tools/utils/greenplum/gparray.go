@@ -2,22 +2,34 @@ package greenplum
 
 import (
 	"fmt"
+
 	"github.com/greenplum-db/gp-common-go-libs/dbconn"
+	"github.com/greenplum-db/gpdb/gp/constants"
+	"github.com/greenplum-db/gpdb/gp/idl"
+	"github.com/greenplum-db/gpdb/gp/utils"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 )
 
 type Segment struct {
-	dbid          int
-	contentId     int
-	role          string
-	prefRole      string
-	mode          string
-	state         string
-	port          int
-	dataDirectory string
-	hostAddress   string
-	hostName      string
+	Dbid          int
+	ContentId     int
+	Role          string
+	PrefRole      string
+	Mode          string
+	State         string
+	Port          int
+	DataDirectory string
+	HostAddress   string
+	HostName      string
+}
+
+type GpArray struct {
+	Segments []Segment
+}
+
+func NewGpArray() *GpArray {
+	return &GpArray{}
 }
 
 //func main() {
@@ -65,29 +77,38 @@ type Segment struct {
 //	fmt.Println(gpPrimary)
 //}
 
-func (seg *Segment) ReadGpSegmentConfig() ([]Segment, error) {
+func (gpArray *GpArray) ReadGpSegmentConfig(host string, port int) error {
 	// Returns the contents of gp_segment_configuration table
-	conn := dbconn.NewDBConnFromEnvironment("postgres")
+	user, _ := utils.System.CurrentUser()
+	conn := dbconn.NewDBConn("postgres", user.Username, host, port)
 	defer conn.Close()
 
 	conerr := conn.Connect(1, true)
 	if conerr != nil {
 		fmt.Println("Connection failed")
-		return nil, conerr
+		return conerr
 	}
 
 	query := "select dbid, content, role, preferred_role, mode, status, port, datadir, hostname, address " +
 		"from pg_catalog.gp_segment_configuration  order by content asc, role desc;"
 	rows, err := conn.Query(query)
+	defer rows.Close()
 
 	if err != nil {
-		return nil, err
+		return err
 	}
-	defer rows.Close()
-	return seg.BuildGpArray(rows)
+
+	result, err := buildGpArray(rows)
+	if err != nil {
+		return err
+	}
+
+	gpArray.Segments = result
+
+	return nil
 }
 
-func (seg *Segment) BuildGpArray(rows *sqlx.Rows) ([]Segment, error) {
+func buildGpArray(rows *sqlx.Rows) ([]Segment, error) {
 
 	result := []Segment{}
 
@@ -95,16 +116,16 @@ func (seg *Segment) BuildGpArray(rows *sqlx.Rows) ([]Segment, error) {
 		dest := Segment{}
 
 		if rErr := rows.Scan(
-			&dest.dbid,
-			&dest.contentId,
-			&dest.role,
-			&dest.prefRole,
-			&dest.mode,
-			&dest.state,
-			&dest.port,
-			&dest.dataDirectory,
-			&dest.hostName,
-			&dest.hostAddress,
+			&dest.Dbid,
+			&dest.ContentId,
+			&dest.Role,
+			&dest.PrefRole,
+			&dest.Mode,
+			&dest.State,
+			&dest.Port,
+			&dest.DataDirectory,
+			&dest.HostName,
+			&dest.HostAddress,
 		); rErr != nil {
 			return nil, rErr
 		}
@@ -114,30 +135,25 @@ func (seg *Segment) BuildGpArray(rows *sqlx.Rows) ([]Segment, error) {
 	return result, nil
 }
 
-func (seg *Segment) GetPrimarySegments(gpArray []Segment) ([]Segment, error) {
+func (gpArray *GpArray) GetPrimarySegments() ([]Segment, error) {
 
 	var result []Segment
 
-	for item := range gpArray {
-		if seg.isSegmentPrimary(gpArray[item]) {
-			result = append(result, gpArray[item])
+	for _, seg := range gpArray.Segments {
+		if seg.isSegmentPrimary() {
+			result = append(result, seg)
 		}
 	}
 	return result, nil
 }
 
-func (seg *Segment) isSegmentPrimary(item Segment) bool {
-	role := item.role
-	prefRole := item.prefRole
-	if item.contentId >= 0 && ((role == ROLE_PRIMARY) || (prefRole == ROLE_PRIMARY)) {
-		return true
-	}
-	return false
+func (seg *Segment) isSegmentPrimary() bool {
+	return seg.ContentId >= 0 && ((seg.Role == constants.ROLE_PRIMARY) || (seg.PrefRole == constants.ROLE_PRIMARY))
 }
 
-func (seg *Segment) RegisterSegment(segs []Segment) error {
-
-	conn := dbconn.NewDBConnFromEnvironment("postgres")
+func RegisterPrimaries(segs []*idl.Segment, host string, port int) error {
+	user, _ := utils.System.CurrentUser()
+	conn := dbconn.NewDBConn("template1", user.Username, host, port)
 	defer conn.Close()
 
 	conerr := conn.Connect(1, true)
@@ -146,15 +162,34 @@ func (seg *Segment) RegisterSegment(segs []Segment) error {
 		return nil
 	}
 
-	addSegmentQueryString := "SELECT pg_catalog.gp_add_segment_primary( '%s', '%s', %d, '%s');"
-	for _, segment := range segs {
-		addSegmentQuery := fmt.Sprintf(addSegmentQueryString, segment.hostName, segment.hostAddress, segment.port, segment.dataDirectory)
+	addPrimaryQuery := "SELECT pg_catalog.gp_add_segment_primary( '%s', '%s', %d, '%s');"
+	for _, seg := range segs {
+		addSegmentQuery := fmt.Sprintf(addPrimaryQuery, seg.HostName, seg.HostAddress, seg.Port, seg.DataDirectory)
 		fmt.Println(addSegmentQuery)
 
 		_, err := conn.Exec(addSegmentQuery)
 		if err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func RegisterCoordinator(seg *idl.Segment) error {
+	user, _ := utils.System.CurrentUser()
+	conn := dbconn.NewDBConn("template1", user.Username, seg.HostName, int(seg.Port))
+	defer conn.Close()
+
+	conerr := conn.Connect(1, true)
+	if conerr != nil {
+		fmt.Println("Connection failed")
+		return nil
+	}
+
+	addCoordinatorQuery := "SELECT pg_catalog.gp_add_segment(1::int2, -1::int2, 'p', 'p', 's', 'u', '%d', '%s', '%s', '%s')"
+	_, err := conn.Exec(fmt.Sprintf(addCoordinatorQuery, int(seg.Port), seg.HostName, seg.HostAddress, seg.DataDirectory))
+	if err != nil {
+		return err
 	}
 	return nil
 }

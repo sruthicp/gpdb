@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"slices"
+	"strconv"
 	"strings"
 
+	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/greenplum-db/gpdb/gp/utils"
 )
 
@@ -17,11 +20,13 @@ const (
 )
 
 func UpdatePostgresqlConf(pgdata string, configParams map[string]string, overwrite bool) error {
+	gplog.Info("Updating %s for data directory %s with: %s", postgresqlConfFile, pgdata, configParams)
 	err := updateConfFile(postgresqlConfFile, pgdata, configParams, overwrite)
 	if err != nil {
 		return err
 	}
 
+	gplog.Info("Successfully updated %s for data directory %s", postgresqlConfFile, pgdata)
 	return nil
 }
 
@@ -39,10 +44,11 @@ func CreatePostgresInternalConf(pgdata string, dbid int) error {
 		return err
 	}
 
+	gplog.Info("Successfully created %s for data directory %s", postgresInternalConfFile, pgdata)
 	return nil
 }
 
-func CreatePgHbaConf(pgdata string, hbaHostnames bool, coordinatorIps []string, hostname string) error {
+func UpdateCoordinatorPgHbaConf(pgdata string, hbaHostnames bool, hostname string) error {
 	pgHbaFilePath := filepath.Join(pgdata, pgHbaConfFile)
 
 	file, err := utils.System.Open(pgHbaFilePath)
@@ -66,68 +72,75 @@ func CreatePgHbaConf(pgdata string, hbaHostnames bool, coordinatorIps []string, 
 		return err
 	}
 
-	var localAccessString = "local\t%s\t%s\tident"
-	var hostAccessString = "host\t%s\t%s\t%s\ttrust"
+	localAccessString := "local\t%s\t%s\tident"
+	addrs, err := getHostAddrs(hbaHostnames, hostname)
+	if err != nil {
+		return err
+	}
 
 	// Add access entries
 	line := fmt.Sprintf(localAccessString, "all", user.Username)
 	updatedLines = append(updatedLines, line)
-
-	if hbaHostnames {
-		line = fmt.Sprintf(hostAccessString, "all", user.Username, "localhost")
-		updatedLines = append(updatedLines, line)
-		line = fmt.Sprintf(hostAccessString, "all", user.Username, hostname)
-		updatedLines = append(updatedLines, line)
-	} else {
-		ipAdresses, err := utils.System.InterfaceAddrs()
-		if err != nil {
-			return err
-		}
-
-		for _, ip := range ipAdresses {
-			line = fmt.Sprintf(hostAccessString, "all", user.Username, ip)
-			updatedLines = append(updatedLines, line)
-		}
-	}
-
-	// Add coordinator IP addresses
-	if len(coordinatorIps) != 0 {
-		for _, ip := range coordinatorIps {
-			line = fmt.Sprintf(hostAccessString, "all", "all", ip)
-			updatedLines = append(updatedLines, line)
-		}
-	}
+	addPgHbaEntries(&updatedLines, []string{"localhost"}, "all", user.Username)
+	addPgHbaEntries(&updatedLines, addrs, "all", user.Username)
 
 	// Add replication entries
 	line = fmt.Sprintf(localAccessString, "replication", user.Username)
 	updatedLines = append(updatedLines, line)
-	line = fmt.Sprintf(hostAccessString, "replication", user.Username, "samehost")
-	updatedLines = append(updatedLines, line)
-
-	if hbaHostnames {
-		line = fmt.Sprintf(hostAccessString, "replication", user.Username, hostname)
-		updatedLines = append(updatedLines, line)
-	} else {
-		ipAdresses, err := utils.System.InterfaceAddrs()
-		if err != nil {
-			return err
-		}
-
-		for _, ip := range ipAdresses {
-			line = fmt.Sprintf(hostAccessString, "replication", user.Username, ip)
-			updatedLines = append(updatedLines, line)
-		}
-	}
+	addPgHbaEntries(&updatedLines, []string{"samehost"}, "replication", user.Username)
+	addPgHbaEntries(&updatedLines, addrs, "replication", user.Username)
 
 	err = utils.WriteLinesToFile(pgHbaFilePath, updatedLines)
 	if err != nil {
 		return err
 	}
 
+	gplog.Info("Successfully updated %s for data directory %s", pgHbaConfFile, pgdata)
+	return nil
+}
+func UpdateSegmentPgHbaConf(pgdata string, hbaHostnames bool, coordinatorAddrs []string, hostname string) error {
+	pgHbaFilePath := filepath.Join(pgdata, pgHbaConfFile)
+
+	file, err := utils.System.Open(pgHbaFilePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	updatedLines := []string{}
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		updatedLines = append(updatedLines, line)
+	}
+
+	user, err := utils.System.CurrentUser()
+	if err != nil {
+		return err
+	}
+
+	addrs, err := getHostAddrs(hbaHostnames, hostname)
+	if err != nil {
+		return err
+	}
+
+	// Add coordinator entries
+	addPgHbaEntries(&updatedLines, coordinatorAddrs, "all", "all")
+
+	// Add access entries
+	addPgHbaEntries(&updatedLines, addrs, "all", user.Username)
+
+	err = utils.WriteLinesToFile(pgHbaFilePath, updatedLines)
+	if err != nil {
+		return err
+	}
+
+	gplog.Info("Successfully updated %s for data directory %s", pgHbaConfFile, pgdata)
 	return nil
 }
 
 func updateConfFile(filename, pgdata string, configParams map[string]string, overwrite bool) error {
+	var line string
 	confFilePath := filepath.Join(pgdata, filename)
 
 	file, err := utils.System.Open(confFilePath)
@@ -139,7 +152,7 @@ func updateConfFile(filename, pgdata string, configParams map[string]string, ove
 	updatedLines := []string{}
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		line := scanner.Text()
+		line = scanner.Text()
 
 		for key, value := range configParams {
 			pattern, err := regexp.Compile(fmt.Sprintf("^%s[\\s=]+", key))
@@ -151,7 +164,7 @@ func updateConfFile(filename, pgdata string, configParams map[string]string, ove
 				if !overwrite {
 					updatedLines = append(updatedLines, fmt.Sprintf("# %s", line))
 				}
-				line = fmt.Sprintf("%s = %s", key, value)
+				line = fmt.Sprintf("%s = %s", key, quoteString(value))
 				delete(configParams, key)
 			}
 		}
@@ -159,8 +172,9 @@ func updateConfFile(filename, pgdata string, configParams map[string]string, ove
 		updatedLines = append(updatedLines, line)
 	}
 
+	// Add the remaining entries
 	for key, value := range configParams {
-		line := fmt.Sprintf("%s = %s", key, value)
+		line := fmt.Sprintf("%s = %s", key, quoteString(value))
 		updatedLines = append(updatedLines, line)
 	}
 
@@ -170,4 +184,42 @@ func updateConfFile(filename, pgdata string, configParams map[string]string, ove
 	}
 
 	return nil
+}
+
+func getHostAddrs(hbaHostnames bool, hostname string) ([]string, error) {
+	var addrs []string
+
+	if hbaHostnames {
+		addrs = []string{hostname}
+	} else {
+		ipAdresses, err := utils.System.InterfaceAddrs()
+		if err != nil {
+			return nil, err
+		}
+
+		for _, ip := range ipAdresses {
+			addrs = append(addrs, ip.String())
+		}
+	}
+
+	return addrs, nil
+}
+
+func addPgHbaEntries(existingEntries *[]string, addrs []string, accessType string, user string) {
+	var hostAccessString = "host\t%s\t%s\t%s\ttrust"
+
+	for _, addr := range addrs {
+		line := fmt.Sprintf(hostAccessString, accessType, user, addr)
+		if !slices.Contains(*existingEntries, line) {
+			*existingEntries = append(*existingEntries, line)
+		}
+	}
+}
+
+func quoteString(value string) string {
+	if _, err := strconv.ParseFloat(value, 64); err == nil {
+		return value
+	} else {
+		return fmt.Sprintf("'%s'", value)
+	}
 }

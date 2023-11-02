@@ -121,11 +121,11 @@ guc_2 value_2`,
 			}
 		})
 	}
-	
+
 	t.Run("errors out when there is no file present", func(t *testing.T) {
 		dname, _ := CreateTempConfFile(t, "", "")
 		defer os.RemoveAll(dname)
-		
+
 		expectedErr := os.ErrNotExist
 		err := postgres.UpdatePostgresqlConf(dname, map[string]string{}, true)
 		if !errors.Is(err, expectedErr) {
@@ -136,7 +136,7 @@ guc_2 value_2`,
 	t.Run("returns appropriate error when fails to update the conf file", func(t *testing.T) {
 		dname, _ := CreateTempConfFile(t, "postgresql.conf", "")
 		defer os.RemoveAll(dname)
-		
+
 		expectedErr := errors.New("error")
 		utils.System.Create = func(name string) (*os.File, error) {
 			return nil, expectedErr
@@ -152,22 +152,22 @@ guc_2 value_2`,
 
 func TestCreatePostgresInternalConf(t *testing.T) {
 	testhelper.SetupTestLogger()
-	
+
 	t.Run("successfully creates the internal.auto.conf", func(t *testing.T) {
 		dname, _ := CreateTempConfFile(t, "", "")
 		defer os.RemoveAll(dname)
-		
+
 		err := postgres.CreatePostgresInternalConf(dname, -1)
 		if err != nil {
 			t.Fatalf("unexpected error: %#v", err)
 		}
-		
+
 		confPath := filepath.Join(dname, "internal.auto.conf")
 		result, err := os.ReadFile(confPath)
 		if err != nil {
 			t.Fatalf("unexpected error: %#v", err)
 		}
-		
+
 		expected := "gp_dbid = -1"
 		if string(result) != expected {
 			t.Fatalf("got %s, want %s", result, expected)
@@ -251,7 +251,7 @@ host	replication	gpadmin	1.2.3.4	trust`,
 			}
 			defer utils.ResetSystemFunctions()
 
-			err := postgres.CreatePgHbaConf(dname, tc.hbaHostnames, tc.coordinatorIps, tc.hostname)
+			err := postgres.UpdateSegmentPgHbaConf(dname, tc.hbaHostnames, tc.coordinatorIps, tc.hostname)
 			if err != nil {
 				t.Fatalf("unexpected error: %#v", err)
 			}
@@ -275,7 +275,7 @@ func CreateTempConfFile(t *testing.T, filename, content string) (string, string)
 	if err != nil {
 		t.Fatalf("unexpected error: %#v", err)
 	}
-	
+
 	filepath := filepath.Join(dname, filename)
 	if filename != "" {
 		os.WriteFile(filepath, []byte(content), 0644)

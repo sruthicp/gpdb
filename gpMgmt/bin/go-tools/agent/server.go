@@ -32,11 +32,6 @@ type Server struct {
 	listener   net.Listener
 }
 
-func (s *Server) StartSegment(ctx context.Context, request *idl.StartSegmentRequest) (*idl.StartSegmentReply, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
 func (s *Server) ValidateHostEnv(ctx context.Context, request *idl.ValidateHostEnvRequest) (*idl.ValidateHostEnvReply, error) {
 	err := s.ValidateHostEnvFn(request.DirectoryList, request.Forced)
 	return &idl.ValidateHostEnvReply{}, err
