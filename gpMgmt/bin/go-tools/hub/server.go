@@ -136,12 +136,12 @@ func (s *Server) MakeCluster(request *idl.MakeClusterRequest, server idl.Hub_Mak
 	// err = StartSegments(s.Conns, primarySegs, "-c gp_role=utility")
 
 	gpstopOptions := greenplum.GpStop{
-		DataDirectory: request.GpArray.Coordinator.DataDirectory,
+		DataDirectory:   request.GpArray.Coordinator.DataDirectory,
 		CoordinatorOnly: true,
 	}
 	out, err := greenplum.RunGpCommand(&gpstopOptions, s.GpHome)
 	if err != nil {
-		return &idl.MakeClusterReply{}, fmt.Errorf("executing gpstop: %s, %w", out, err)
+		return fmt.Errorf("executing gpstop: %s, %w", out, err)
 	}
 
 	gpstartOptions := greenplum.GpStart{
@@ -149,9 +149,9 @@ func (s *Server) MakeCluster(request *idl.MakeClusterRequest, server idl.Hub_Mak
 	}
 	out, err = greenplum.RunGpCommand(&gpstartOptions, s.GpHome)
 	if err != nil {
-		return &idl.MakeClusterReply{}, fmt.Errorf("executing gpstart: %s, %w", out, err)
+		return fmt.Errorf("executing gpstart: %s, %w", out, err)
 	}
-	
+
 	// TODO
 	// 1. CREATE_GPEXTENSIONS
 	// 2. IMPORT_COLLATION

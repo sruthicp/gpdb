@@ -93,7 +93,6 @@ func InitClusterServiceFn(hubConfig *hub.Config, inputConfigFile string) error {
 
 	stream, err := client.MakeCluster(context.Background(), clusterReq)
 	done := make(chan bool)
-	errChan := make(chan error)
 	go func() {
 		for {
 			resp, err := stream.Recv()
@@ -104,35 +103,27 @@ func InitClusterServiceFn(hubConfig *hub.Config, inputConfigFile string) error {
 				return
 			}
 			if err != nil {
-				fmt.Printf("Error receiving data from stream:%v\n", err)
-				errChan <- err
-				close(errChan)
+				fmt.Printf("Error:%v\n", err)
+				done <- true
 				return
 			}
 			reply := resp.MakeClusterReply
 			switch reply.(type) {
 			case *idl.MakeClusterReply_Message:
-				fmt.Printf("Got RPC Message:%s\n", resp.GetMessage())
+				fmt.Printf("Message:%s\n", resp.GetMessage())
 			case *idl.MakeClusterReply_Progress:
-				fmt.Printf("Got RPC Progress, Title:%s Progreess:%d\n", resp.GetProgress().GetTitle(), resp.GetProgress().GetPercentProgress())
+				fmt.Printf("Progress, Title:%s Progreess:%d\n", resp.GetProgress().GetTitle(), resp.GetProgress().GetPercentProgress())
 			}
 		}
+		return
 	}()
 	<-done
-	/*
-		fmt.Printf("Checking for error.")
-		err = <-errChan
-		if err != nil {
-			fmt.Printf("Error receiving response:%v", err)
-			close(errChan)
-		}
-	*/
+
 	fmt.Println("Done with Make Cluster. Exiting.")
 	return nil
 }
 
 func LoadToIdl(gparray gpArray, param ClusterParams) *idl.MakeClusterRequest {
-	fmt.Printf("Starting LoadToIdl Coordinator:%v\n", gparray.Coordinator)
 	clusterReq := idl.MakeClusterRequest{}
 	clusterReq.GpArray = &idl.GpArray{}
 	clusterReq.GpArray.Coordinator = &idl.Segment{}
@@ -262,10 +253,12 @@ func validateInputConfig() error {
 		ClusterParam.CommonConfig = make(map[string]string)
 	}
 
+	/* TODO Check this checksum
 	if _, ok := ClusterParam.CommonConfig["heap-checksum"]; !ok {
 		gplog.Info("Could not find HEAP_CHECKSUM in cluster config, defaulting to on.")
 		ClusterParam.CommonConfig["heap-checksum"] = "True"
 	}
+	*/
 
 	// Check if length of Gparray.PimarySegments is 0
 	if len(Gparray.PrimarySegments) == 0 {
@@ -286,22 +279,27 @@ func validateInputConfig() error {
 		gplog.Error("SQL_ASCII is no longer supported as a server encoding")
 	}
 
-	if _, ok := ClusterParam.CoordinatorConfig["maxconnections"]; !ok {
-		gplog.Info("COORDINATOR_MAX_CONNECT not set, will set to default value 150")
-		ClusterParam.CoordinatorConfig["maxconnections"] = string(constants.DefaultQdMaxConnect)
+	if _, ok := ClusterParam.CoordinatorConfig["max_connections"]; !ok {
+		gplog.Info("COORDINATOR max_connectionsT not set, will set to default value 150")
+		ClusterParam.CoordinatorConfig["max_connections"] = string(constants.DefaultQdMaxConnect)
 	}
-	coordinatorMaxConnect, _ := strconv.Atoi(ClusterParam.CoordinatorConfig["maxconnections"])
+
+	coordinatorMaxConnect, err := strconv.Atoi(ClusterParam.CoordinatorConfig["max_connections"])
+	if err != nil {
+		return fmt.Errorf("Error parsing max_connections from json: %v", err)
+	}
+
 	if coordinatorMaxConnect < 1 {
 		gplog.Error("COORDINATOR_MAX_CONNECT less than 1")
 	}
-	if _, ok := ClusterParam.SegmentConfig["maxconnections"]; !ok {
-		ClusterParam.SegmentConfig["maxconnections"] = string(coordinatorMaxConnect * constants.QeConnectFactor)
+	if _, ok := ClusterParam.SegmentConfig["max_connections"]; !ok {
+		ClusterParam.SegmentConfig["max_connections"] = string(coordinatorMaxConnect * constants.QeConnectFactor)
 	}
 
 	// check for shared_buffers if not provided in config then set the COORDINATOR_SHARED_BUFFERS and QE_SHARED_BUFFERS to DEFAULT_BUFFERS (128000 kB)
-	if _, ok := ClusterParam.CommonConfig["shared-buffer"]; !ok {
-		ClusterParam.CommonConfig["shared-buffer"] = constants.DefaultBuffer
-		gplog.Info("shared_buffer is not set, will set to default value 128000kB")
+	if _, ok := ClusterParam.CommonConfig["shared_buffers"]; !ok {
+		ClusterParam.CommonConfig["shared_buffers"] = constants.DefaultBuffer
+		gplog.Info("shared_buffers is not set, will set to default value 128000kB")
 	}
 
 	// check coordinator open file values
