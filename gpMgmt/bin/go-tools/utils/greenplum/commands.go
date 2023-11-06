@@ -2,7 +2,9 @@ package greenplum
 
 import (
 	"bytes"
+	"fmt"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/greenplum-db/gpdb/gp/utils"
@@ -24,15 +26,18 @@ func NewGpCommand(gpCmd GpCommand, gphome string) *exec.Cmd {
 
 func RunGpCommand(gpCmd GpCommand, gphome string) (*bytes.Buffer, error) {
 	stdout := new(bytes.Buffer)
-    stderr := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
 
-	cmd := NewGpCommand(gpCmd, gphome)
+	newGpCmd := NewGpCommand(gpCmd, gphome)
+
+	// Source greenplum_path.sh
+	gpSourceFile := filepath.Join(gphome, "greenplum_path.sh")
+	cmd := utils.System.ExecCommand("bash", "-c", fmt.Sprintf("source %s && %s", gpSourceFile, newGpCmd.String()))
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 
 	gplog.Debug("Executing command: %s", cmd.String())
 	err := cmd.Run()
-
 	if err != nil {
 		return stderr, err
 	} else {
@@ -40,13 +45,28 @@ func RunGpCommand(gpCmd GpCommand, gphome string) (*bytes.Buffer, error) {
 	}
 }
 
+type GpStop struct {
+	DataDirectory   string
+	CoordinatorOnly bool
+}
+
+func (cmd *GpStop) buildGpCommand(gphome string) *exec.Cmd {
+	utility := postgres.GetGphomeUtilityPath(gphome, gpstop)
+	args := []string{"-a"}
+
+	args = postgres.AppendIfNotEmpty(args, "-d", cmd.DataDirectory)
+	args = postgres.AppendIfNotEmpty(args, "--coordinator_only", cmd.CoordinatorOnly)
+
+	return utils.System.ExecCommand(utility, args...)
+}
+
 type GpStart struct {
-	DataDirectory         string
+	DataDirectory   string
 }
 
 func (cmd *GpStart) buildGpCommand(gphome string) *exec.Cmd {
 	utility := postgres.GetGphomeUtilityPath(gphome, gpstart)
-	args := []string{}
+	args := []string{"-a"}
 
 	args = postgres.AppendIfNotEmpty(args, "-d", cmd.DataDirectory)
 

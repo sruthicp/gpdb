@@ -3,12 +3,13 @@ package greenplum
 import (
 	"fmt"
 
+	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
+
 	"github.com/greenplum-db/gp-common-go-libs/dbconn"
 	"github.com/greenplum-db/gpdb/gp/constants"
 	"github.com/greenplum-db/gpdb/gp/idl"
 	"github.com/greenplum-db/gpdb/gp/utils"
-	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
 )
 
 type Segment struct {
@@ -22,6 +23,10 @@ type Segment struct {
 	DataDirectory string
 	HostAddress   string
 	HostName      string
+}
+
+func (seg *Segment) isSegmentPrimary() bool {
+	return seg.ContentId >= 0 && ((seg.Role == constants.ROLE_PRIMARY) || (seg.PrefRole == constants.ROLE_PRIMARY))
 }
 
 type GpArray struct {
@@ -147,10 +152,6 @@ func (gpArray *GpArray) GetPrimarySegments() ([]Segment, error) {
 	return result, nil
 }
 
-func (seg *Segment) isSegmentPrimary() bool {
-	return seg.ContentId >= 0 && ((seg.Role == constants.ROLE_PRIMARY) || (seg.PrefRole == constants.ROLE_PRIMARY))
-}
-
 func RegisterPrimaries(segs []*idl.Segment, host string, port int) error {
 	user, _ := utils.System.CurrentUser()
 	conn := dbconn.NewDBConn("template1", user.Username, host, port)
@@ -172,6 +173,15 @@ func RegisterPrimaries(segs []*idl.Segment, host string, port int) error {
 			return err
 		}
 	}
+
+	// FIXME: gp_add_segment_primary() starts the content ID from 1,
+	// so manually update the correct values for now.
+	updateContentIdQuery := "SET allow_system_table_mods=true; UPDATE gp_segment_configuration SET content = content - 1 where content > 0;"
+	_, err := conn.Exec(updateContentIdQuery)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

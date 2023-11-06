@@ -12,14 +12,18 @@ import (
 )
 
 func (s *Server) MakeSegment(ctx context.Context, in *idl.MakeSegmentRequest) (*idl.MakeSegmentReply, error) {
-	dataDirectory := in.Segment.GetDataDirectory()
-	locale := in.GetLocale()
+	dataDirectory := in.Segment.DataDirectory
+	locale := in.Locale
 
 	initdbOptions := postgres.Initdb{
 		PgData: dataDirectory,
-		Encoding: in.GetEncoding(),
-		LcCollate: locale.GetLcCollate(),
-		LcCtype: locale.GetLcCtype(),
+		Encoding: in.Encoding,
+		LcCollate: locale.LcCollate,
+		LcCtype: locale.LcCtype,
+		LcMessages: locale.LcMessages,
+		LcMonetory: locale.LcMonetory,
+		LcNumeric: locale.LcNumeric,
+		LcTime: locale.LcTime,
 		DataChecksums: true,
 	}
 	out, err := postgres.RunPgCommand(&initdbOptions, s.GpHome)
@@ -31,15 +35,17 @@ func (s *Server) MakeSegment(ctx context.Context, in *idl.MakeSegmentRequest) (*
 	maps.Copy(configParams, in.SegConfig)
 	configParams["port"] = strconv.Itoa(int(in.Segment.Port))
 	configParams["listen_addresses"] = "*"
-	configParams["log_statement"] = "all"
 	configParams["gp_contentid"] = strconv.Itoa(int(in.Segment.Contentid))
+	if in.Segment.Contentid == -1 {
+		configParams["log_statement"] = "all"
+	}
 
 	err = postgres.UpdatePostgresqlConf(dataDirectory, configParams, false)
 	if err != nil {
 		return &idl.MakeSegmentReply{}, fmt.Errorf("updating postgresql.conf: %w", err)
 	}
 
-	err = postgres.CreatePostgresInternalConf(dataDirectory, int(in.Segment.GetDbid()))
+	err = postgres.CreatePostgresInternalConf(dataDirectory, int(in.Segment.Dbid))
 	if err != nil {
 		return &idl.MakeSegmentReply{}, fmt.Errorf("creating internal.auto.conf: %w", err)
 	}

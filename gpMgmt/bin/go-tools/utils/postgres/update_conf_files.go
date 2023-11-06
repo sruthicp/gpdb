@@ -3,6 +3,7 @@ package postgres
 import (
 	"bufio"
 	"fmt"
+	"net"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -192,13 +193,15 @@ func getHostAddrs(hbaHostnames bool, hostname string) ([]string, error) {
 	if hbaHostnames {
 		addrs = []string{hostname}
 	} else {
-		ipAdresses, err := utils.System.InterfaceAddrs()
+		ipAddresses, err := utils.System.InterfaceAddrs()
 		if err != nil {
 			return nil, err
 		}
 
-		for _, ip := range ipAdresses {
-			addrs = append(addrs, ip.String())
+		for _, ip := range ipAddresses {
+			if ipnet, ok := ip.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+				addrs = append(addrs, ip.String())
+			}
 		}
 	}
 
@@ -216,6 +219,9 @@ func addPgHbaEntries(existingEntries *[]string, addrs []string, accessType strin
 	}
 }
 
+/*
+Enclose string values inside quotes
+*/
 func quoteString(value string) string {
 	if _, err := strconv.ParseFloat(value, 64); err == nil {
 		return value

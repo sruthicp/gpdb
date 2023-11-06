@@ -93,7 +93,32 @@ func (s *Server) MakeCluster(ctx context.Context, request *idl.MakeClusterReques
 		return &idl.MakeClusterReply{}, err
 	}
 
-	err = StartSegments(s.Conns, primarySegs, "-c gp_role=utility")
+	// We do not start the primary segments, only the coordinator.
+	// Only in case of mirrors, we start them at the end after gpstop/gpstart
+	// err = StartSegments(s.Conns, primarySegs, "-c gp_role=utility")
+
+	gpstopOptions := greenplum.GpStop{
+		DataDirectory: request.GpArray.Coordinator.DataDirectory,
+		CoordinatorOnly: true,
+	}
+	out, err := greenplum.RunGpCommand(&gpstopOptions, s.GpHome)
+	if err != nil {
+		return &idl.MakeClusterReply{}, fmt.Errorf("executing gpstop: %s, %w", out, err)
+	}
+
+	gpstartOptions := greenplum.GpStart{
+		DataDirectory: request.GpArray.Coordinator.DataDirectory,
+	}
+	out, err = greenplum.RunGpCommand(&gpstartOptions, s.GpHome)
+	if err != nil {
+		return &idl.MakeClusterReply{}, fmt.Errorf("executing gpstart: %s, %w", out, err)
+	}
+	
+	// TODO
+	// 1. CREATE_GPEXTENSIONS
+	// 2. IMPORT_COLLATION
+	// 3. CREATE_DATABASE
+	// 4. SET_GP_USER_PW
 
 	return &idl.MakeClusterReply{}, err
 }

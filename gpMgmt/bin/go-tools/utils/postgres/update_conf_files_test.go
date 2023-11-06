@@ -32,7 +32,7 @@ guc_1 = value_1
 guc_2 = value_2
 # comment`,
 			expected: `
-guc_1 = new_value_1
+guc_1 = 'new_value_1'
 guc_2 = value_2
 # comment`,
 		},
@@ -47,7 +47,7 @@ guc_2 = value_2
 # comment`,
 			expected: `
 # guc_1 = value_1
-guc_1 = new_value_1
+guc_1 = 'new_value_1'
 guc_2 = value_2
 # comment`,
 		},
@@ -61,21 +61,23 @@ guc_2 = value_2
 guc_1 = value_1
 guc_2 = value_2`,
 			expected: `
-guc_1 = new_value_1
+guc_1 = 'new_value_1'
 guc_2 = value_2
-guc_3 = new_value_3`,
+guc_3 = 'new_value_3'`,
 		},
 		{
 			overwrite: true,
 			configParams: map[string]string{
 				"guc_1": "new_value_1",
+				"guc_3": "1234",
 			},
 			confContent: `
 guc_1 value_1
 guc_2 value_2`,
 			expected: `
-guc_1 = new_value_1
-guc_2 value_2`,
+guc_1 = 'new_value_1'
+guc_2 value_2
+guc_3 = 1234`,
 		},
 		{
 			overwrite: true,
@@ -91,7 +93,7 @@ guc_1a = value_1
 guc_1_a=value_1
 guc_2 value_2`,
 			expected: `
-guc_1 = new_value_1
+guc_1 = 'new_value_1'
 #guc_1 value_1
 guc_1a value_1
 guc_1_a value_1
@@ -180,7 +182,6 @@ func TestBuildPgHbaConf(t *testing.T) {
 
 	cases := []struct {
 		hbaHostnames   bool
-		coordinatorIps []string
 		hostname       string
 		confContent    string
 		expected       string
@@ -190,6 +191,7 @@ func TestBuildPgHbaConf(t *testing.T) {
 			hostname:     "cdw",
 			confContent:  ``,
 			expected: `local	all	gpadmin	ident
+host	all	gpadmin	localhost	trust
 host	all	gpadmin	1.2.3.4	trust
 local	replication	gpadmin	ident
 host	replication	gpadmin	samehost	trust
@@ -221,23 +223,10 @@ local	replication	gpadmin	ident
 host	replication	gpadmin	samehost	trust
 host	replication	gpadmin	cdw	trust`,
 		},
-		{
-			hbaHostnames:   false,
-			coordinatorIps: []string{"1.1.1.1", "2.2.2.2"},
-			hostname:       "cdw",
-			confContent:    ``,
-			expected: `local	all	gpadmin	ident
-host	all	gpadmin	1.2.3.4	trust
-host	all	all	1.1.1.1	trust
-host	all	all	2.2.2.2	trust
-local	replication	gpadmin	ident
-host	replication	gpadmin	samehost	trust
-host	replication	gpadmin	1.2.3.4	trust`,
-		},
 	}
 
 	for _, tc := range cases {
-		t.Run("correctly builds the pg_hba.conf file", func(t *testing.T) {
+		t.Run("correctly builds the coordinator pg_hba.conf file", func(t *testing.T) {
 			dname, confPath := CreateTempConfFile(t, "pg_hba.conf", tc.confContent)
 			defer os.RemoveAll(dname)
 
@@ -251,7 +240,7 @@ host	replication	gpadmin	1.2.3.4	trust`,
 			}
 			defer utils.ResetSystemFunctions()
 
-			err := postgres.UpdateSegmentPgHbaConf(dname, tc.hbaHostnames, tc.coordinatorIps, tc.hostname)
+			err := postgres.UpdateCoordinatorPgHbaConf(dname, tc.hbaHostnames, tc.hostname)
 			if err != nil {
 				t.Fatalf("unexpected error: %#v", err)
 			}
