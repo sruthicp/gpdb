@@ -9,7 +9,7 @@ service Hub {
     rpc StartAgents(StartAgentsRequest) returns (StartAgentsReply) {}
     rpc StatusAgents(StatusAgentsRequest) returns (StatusAgentsReply) {}
     rpc StopAgents(StopAgentsRequest) returns (StopAgentsReply) {}
-    rpc MakeCluster(MakeClusterRequest) returns(MakeClusterReply) {}
+    rpc MakeCluster(MakeClusterRequest) returns(stream MakeClusterReply) {}
 }
 
 message StopHubRequest {}
@@ -42,7 +42,17 @@ message MakeClusterRequest {
     bool forceFlag = 3;
 }
 
-message MakeClusterReply {}
+message MakeClusterReply {
+    oneof makeClusterReply {
+        string message=1;
+        ProgressMessage progress = 2;
+    };
+}
+
+message ProgressMessage {
+    string title = 1;
+    int32 percentProgress = 2;
+}
 
 message gpArray {
     Segment Coordinator = 1;
@@ -66,6 +76,7 @@ message ClusterParams{
     bool hbaHostnames = 5;
     string encoding = 6;
     string suPassword = 7;
+    string dbName = 8;
 }
 
 message Locale {

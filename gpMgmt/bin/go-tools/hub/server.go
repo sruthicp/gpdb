@@ -59,19 +59,57 @@ type Server struct {
 	finish     chan struct{}
 }
 
-func (s *Server) MakeCluster(ctx context.Context, request *idl.MakeClusterRequest) (*idl.MakeClusterReply, error) {
-	//TODO implement me
+func ReplyLogMsg(msg string, server idl.Hub_MakeClusterServer) error {
+	logResponse := idl.MakeClusterReply_Message{
+		msg,
+	}
+	response := idl.MakeClusterReply{MakeClusterReply: &logResponse}
+	err := server.Send(&response)
+	if err != nil {
+		gplog.Error("Error replying MakeCluster RPC:%v", err)
+		return err
+	}
+	return nil
+}
+
+func ReplyProgress(msg string, percent int, server idl.Hub_MakeClusterServer) error {
+
+	progressMsg := idl.ProgressMessage{Title: msg, PercentProgress: int32(percent)}
+	progress := idl.MakeClusterReply_Progress{Progress: &progressMsg}
+	response := idl.MakeClusterReply{
+		MakeClusterReply: &progress,
+	}
+	err := server.Send(&response)
+	if err != nil {
+		gplog.Error("Error replying MakeCluster RPC:%v", err)
+		return err
+	}
+	return nil
+}
+
+func (s *Server) MakeCluster(request *idl.MakeClusterRequest, server idl.Hub_MakeClusterServer) error {
+	gplog.Debug("Starting TestRPC")
+
+	err := ReplyLogMsg("Starting MakeCluster", server)
+	if err != nil {
+		return err
+	}
+
+	err = ReplyProgress("Validation", 0, server)
+	if err != nil {
+		return err
+	}
 
 	var clusterParams common.ClusterParams
 	var gparray common.GpArray
 	clusterParams.LoadFromIdl(request.ClusterParams)
 	gparray.LoadFromIdl(request.GpArray)
 
-	err := s.MakeActualCluster(gparray, clusterParams, request.ForceFlag)
+	err = s.MakeActualCluster(gparray, clusterParams, request.ForceFlag)
 
 	err = CreateAndStartCoordinator(s.Conns, request.GpArray.Coordinator, request.ClusterParams)
 	if err != nil {
-		return &idl.MakeClusterReply{}, err
+		return err
 	}
 
 	greenplum.RegisterCoordinator(request.GpArray.Coordinator)
@@ -80,17 +118,17 @@ func (s *Server) MakeCluster(ctx context.Context, request *idl.MakeClusterReques
 	gpArray := greenplum.NewGpArray()
 	err = gpArray.ReadGpSegmentConfig(request.GpArray.Coordinator.HostName, int(request.GpArray.Coordinator.Port))
 	if err != nil {
-		return &idl.MakeClusterReply{}, err
+		return err
 	}
 
 	primarySegs, err := gpArray.GetPrimarySegments()
 	if err != nil {
-		return &idl.MakeClusterReply{}, err
+		return err
 	}
 
 	err = CreateSegments(s.Conns, primarySegs, request.ClusterParams, []string{})
 	if err != nil {
-		return &idl.MakeClusterReply{}, err
+		return err
 	}
 
 	// We do not start the primary segments, only the coordinator.
@@ -120,7 +158,7 @@ func (s *Server) MakeCluster(ctx context.Context, request *idl.MakeClusterReques
 	// 3. CREATE_DATABASE
 	// 4. SET_GP_USER_PW
 
-	return &idl.MakeClusterReply{}, err
+	return err
 }
 
 type Connection struct {

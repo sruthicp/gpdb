@@ -49,6 +49,7 @@ type ClusterParams struct {
 	hbaHostname bool
 	encoding    string
 	suPassword  string
+	daName      string
 }
 
 func (c *ClusterParams) LoadFromIdl(input *idl.ClusterParams) {
@@ -59,6 +60,7 @@ func (c *ClusterParams) LoadFromIdl(input *idl.ClusterParams) {
 	c.Locale.LoadFromIdl(input.Locale)
 	c.hbaHostname = input.HbaHostnames
 	c.suPassword = input.SuPassword
+	c.daName = input.DbName
 }
 
 type GpArray struct {
