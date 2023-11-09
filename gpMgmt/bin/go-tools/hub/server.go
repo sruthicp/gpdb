@@ -106,6 +106,10 @@ func (s *Server) MakeCluster(request *idl.MakeClusterRequest, server idl.Hub_Mak
 	gparray.LoadFromIdl(request.GpArray)
 
 	err = s.MakeActualCluster(gparray, clusterParams, request.ForceFlag)
+	if err != nil {
+		gplog.Error("Error during validation:%v", err)
+		return err
+	}
 
 	err = CreateAndStartCoordinator(s.Conns, request.GpArray.Coordinator, request.ClusterParams)
 	if err != nil {

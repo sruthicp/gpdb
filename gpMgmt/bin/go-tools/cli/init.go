@@ -7,7 +7,6 @@ import (
 	"github.com/greenplum-db/gpdb/gp/constants"
 	"github.com/greenplum-db/gpdb/gp/hub"
 	"github.com/greenplum-db/gpdb/gp/idl"
-	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"io"
@@ -27,6 +26,7 @@ var (
 
 type InputConfig struct {
 	ClusterName     string              `mapstructure:"cluster-name"`
+	DbName          string              `mapstructure:"db-name"`
 	Encoding        string              `mapstructure:"encoding"`
 	HbaHostnames    bool                `mapstructure:"hba-hostnames"`
 	SuPassword      string              `mapstructure:"su-password"`
@@ -36,6 +36,43 @@ type InputConfig struct {
 	SegmentConfig   map[string]string   `mapstructure:"segment-config"`
 	Coordinator     map[string]string   `mapstructure:"coordinator"`
 	PrimarySegments []map[string]string `mapstructure:"primary-segments-array"`
+}
+
+func SegmentToIdl(input Segment) *idl.Segment {
+	segment := idl.Segment{}
+	segment.HostName = input.hostName
+	segment.HostAddress = input.hostAddress
+	segment.DataDirectory = input.dataDirectory
+	segment.Port = int32(input.port)
+	return &segment
+}
+
+func LoadClusterParams(input ClusterParams) *idl.ClusterParams {
+	clusterParam := new(idl.ClusterParams)
+	// Populate ClusterParams
+	clusterParam.HbaHostnames = input.hbaHostname
+	clusterParam.SuPassword = input.suPassword
+	clusterParam.Encoding = input.encoding
+
+	clusterParam.DbName = input.dbname
+	clusterParam.CommonConfig = input.CommonConfig
+	clusterParam.CoordinatorConfig = input.CoordinatorConfig
+	clusterParam.SegmentConfig = input.SegmentConfig
+
+	// Load Locacle
+	clusterParam.Locale = LoadLocale(input.Locale)
+	return clusterParam
+}
+func LoadLocale(param Locale) *idl.Locale {
+	locale := new(idl.Locale)
+	locale.LcCollate = param.LcCollate
+	locale.LcAll = param.LcAll
+	locale.LcCtype = param.LcCtype
+	locale.LcMessages = param.LcMessages
+	locale.LcMonetory = param.LcMonetary
+	locale.LcTime = param.LcTime
+	locale.LcNumeric = param.LcNumeric
+	return locale
 }
 
 func initCmd() *cobra.Command {
@@ -88,10 +125,15 @@ func InitClusterServiceFn(hubConfig *hub.Config, inputConfigFile string) error {
 	if err != nil {
 		return err
 	}
+
 	// TODO Populate clusterReq with data
 	clusterReq := LoadToIdl(Gparray, ClusterParam)
 
 	stream, err := client.MakeCluster(context.Background(), clusterReq)
+	if err != nil {
+		gplog.Error("Error calling hub to create cluster:%v", err)
+		return fmt.Errorf("error calling hub to create cluster:%v", err)
+	}
 	done := make(chan bool)
 	go func() {
 		for {
@@ -115,7 +157,6 @@ func InitClusterServiceFn(hubConfig *hub.Config, inputConfigFile string) error {
 				fmt.Printf("Progress, Title:%s Progreess:%d\n", resp.GetProgress().GetTitle(), resp.GetProgress().GetPercentProgress())
 			}
 		}
-		return
 	}()
 	<-done
 
@@ -126,48 +167,22 @@ func InitClusterServiceFn(hubConfig *hub.Config, inputConfigFile string) error {
 func LoadToIdl(gparray gpArray, param ClusterParams) *idl.MakeClusterRequest {
 	clusterReq := idl.MakeClusterRequest{}
 	clusterReq.GpArray = &idl.GpArray{}
-	clusterReq.GpArray.Coordinator = &idl.Segment{}
 	clusterReq.ClusterParams = &idl.ClusterParams{}
 	clusterReq.ClusterParams.Locale = &idl.Locale{}
 	clusterReq.ClusterParams.CoordinatorConfig = make(map[string]string)
 	clusterReq.ClusterParams.SegmentConfig = make(map[string]string)
 	clusterReq.ClusterParams.CommonConfig = make(map[string]string)
 
-	//GPArray
-	//Coordinator
-	clusterReq.GpArray.Coordinator.HostAddress = gparray.Coordinator.hostAddress
-	clusterReq.GpArray.Coordinator.HostName = gparray.Coordinator.hostName
-	clusterReq.GpArray.Coordinator.Port = int32(gparray.Coordinator.port)
-	clusterReq.GpArray.Coordinator.DataDirectory = gparray.Coordinator.dataDirectory
+	//Populate GPArray
+	clusterReq.GpArray.Coordinator = SegmentToIdl(gparray.Coordinator)
 
-	//Primaries
 	for _, seg := range gparray.PrimarySegments {
-		newSeg := new(idl.Segment)
-		newSeg.HostName = seg.hostName
-		newSeg.HostAddress = seg.hostAddress
-		newSeg.Port = int32(seg.port)
-		newSeg.DataDirectory = seg.dataDirectory
+		newSeg := SegmentToIdl(seg)
 		clusterReq.GpArray.Primaries = append(clusterReq.GpArray.Primaries, newSeg)
 	}
 
-	// ClusterParams
-	clusterReq.ClusterParams.HbaHostnames = param.hbaHostname
-	clusterReq.ClusterParams.SuPassword = param.suPassword
-	clusterReq.ClusterParams.Encoding = param.encoding
-
-	clusterReq.ClusterParams.DbName = param.dbname
-	clusterReq.ClusterParams.CommonConfig = param.CommonConfig
-	clusterReq.ClusterParams.CoordinatorConfig = param.CoordinatorConfig
-	clusterReq.ClusterParams.SegmentConfig = param.SegmentConfig
-
-	// Locale
-	clusterReq.ClusterParams.Locale.LcTime = param.Locale.LcTime
-	clusterReq.ClusterParams.Locale.LcMonetory = param.Locale.LcTime
-	clusterReq.ClusterParams.Locale.LcNumeric = param.Locale.LcNumeric
-	clusterReq.ClusterParams.Locale.LcMessages = param.Locale.LcMessages
-	clusterReq.ClusterParams.Locale.LcCollate = param.Locale.LcCollate
-	clusterReq.ClusterParams.Locale.LcAll = param.Locale.LcAll
-	clusterReq.ClusterParams.Locale.LcCtype = param.Locale.LcCtype
+	// Populate ClusterParams
+	clusterReq.ClusterParams = LoadClusterParams(param)
 
 	// TODO : Get the forced flag
 	clusterReq.ForceFlag = false
@@ -195,22 +210,22 @@ func readInputConfig(inputConfigFile string) error {
 	if err := viper.ReadInConfig(); err != nil {
 		fmt.Printf("Error reading config file: %s\n", err)
 	}
-	var t InputConfig
+	var input InputConfig
 
-	if err := viper.Unmarshal(&t); err != nil {
+	if err := viper.Unmarshal(&input); err != nil {
 		fmt.Printf("Error reading config file: %s\n", err)
 	}
 
-	ClusterParam.CoordinatorConfig = t.CordConfig
-	ClusterParam.SegmentConfig = t.SegmentConfig
-	ClusterParam.CommonConfig = t.CommonConfig
-	ClusterParam.Locale = t.Locale
-	ClusterParam.hbaHostname = t.HbaHostnames
-	ClusterParam.encoding = t.Encoding
-	ClusterParam.suPassword = t.SuPassword
+	ClusterParam.CoordinatorConfig = input.CordConfig
+	ClusterParam.SegmentConfig = input.SegmentConfig
+	ClusterParam.CommonConfig = input.CommonConfig
+	ClusterParam.Locale = input.Locale
+	ClusterParam.hbaHostname = input.HbaHostnames
+	ClusterParam.encoding = input.Encoding
+	ClusterParam.suPassword = input.SuPassword
 
 	// Copy primary segments
-	for _, ps := range t.PrimarySegments {
+	for _, ps := range input.PrimarySegments {
 		var segment Segment
 		segment.hostName = ps["hostname"]
 		segment.hostAddress = ps["address"]
@@ -223,21 +238,21 @@ func readInputConfig(inputConfigFile string) error {
 		segment.port = port
 		primarySegments = append(primarySegments, segment)
 	}
+	Gparray.PrimarySegments = primarySegments
+
 	// copy coordinator segment
-	port, err := strconv.Atoi(t.Coordinator["port"])
+	port, err := strconv.Atoi(input.Coordinator["port"])
 	if err != nil {
 		gplog.Error("Error converting port number from config file. Error:%v", err)
 		return err
 	}
 	coordinator := Segment{
-		hostName:      t.Coordinator["hostname"],
-		hostAddress:   t.Coordinator["address"],
-		dataDirectory: t.Coordinator["data-directory"],
+		hostName:      input.Coordinator["hostname"],
+		hostAddress:   input.Coordinator["address"],
+		dataDirectory: input.Coordinator["data-directory"],
 		port:          port,
 	}
 	Gparray.Coordinator = coordinator
-	Gparray.PrimarySegments = primarySegments
-	mapstructure.Decode(t.Coordinator, &Gparray.Coordinator)
 
 	return nil
 }
