@@ -14,7 +14,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 )
 
 var (
@@ -22,6 +21,7 @@ var (
 	primarySegments []Segment
 	Gparray         gpArray
 	execCommand     = exec.Command
+	force           bool
 )
 
 type InputConfig struct {
@@ -96,15 +96,18 @@ func initClusterCmd() *cobra.Command {
 		Use:     "cluster",
 		Short:   "Initialize the cluster",
 		PreRunE: InitializeCommand,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return RunInitCluster(cmd, args)
-		},
+		RunE:    RunInitClusterCmd,
 	}
+	initClusterCmd.LocalFlags().Bool("force", false, "Create cluster forcefully by overwriting existing directories")
+	//force, _ := initClusterCmd.LocalFlags().GetBool("force")
 	// TODO `gp init <file>` command should also work. Current `gp init cluster <file>` is implemented
 	// TODO Add forced flag and populate to MakeClusterRequest
 	// TODO Check behavior when provided with no input file. Should give proper error message. Currently giving exception.
 
 	return initClusterCmd
+}
+func RunInitClusterCmd(cmd *cobra.Command, args []string) error {
+	return RunInitCluster(cmd, args)
 }
 
 func InitClusterServiceFn(hubConfig *hub.Config, inputConfigFile string) error {
@@ -190,6 +193,9 @@ func LoadToIdl(gparray gpArray, param ClusterParams) *idl.MakeClusterRequest {
 	return &clusterReq
 }
 func RunInitClusterFn(cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("please provide config file for cluster initialization")
+	}
 	err := InitClusterService(Conf, args[0])
 	if err != nil {
 		return err
@@ -301,7 +307,7 @@ func validateInputConfig() error {
 
 	coordinatorMaxConnect, err := strconv.Atoi(ClusterParam.CoordinatorConfig["max_connections"])
 	if err != nil {
-		return fmt.Errorf("Error parsing max_connections from json: %v", err)
+		return fmt.Errorf("error parsing max_connections from json: %v", err)
 	}
 
 	if coordinatorMaxConnect < 1 {
@@ -320,29 +326,8 @@ func validateInputConfig() error {
 	// check coordinator open file values
 	coordinatorOpenFileLimit, _ := execCommand("ulimit", "-n").CombinedOutput()
 	if val, _ := strconv.Atoi(string(coordinatorOpenFileLimit)); val < constants.OsOpenFiles {
-		gplog.Warn(fmt.Sprintf("Coordinator open file limit is %s should be >= %d", string(coordinatorOpenFileLimit), constants.OsOpenFiles))
+		gplog.Warn(fmt.Sprintf("Coordinator open file limit is %d should be >= %d", coordinatorOpenFileLimit, constants.OsOpenFiles))
 	}
 
 	return nil
-}
-
-func getAllAvailableLocales() string {
-	availableLocales, err := execCommand("locale", "-a").CombinedOutput()
-	if err != nil {
-		fmt.Errorf("failed to get the available locales on this system: %w", err)
-	}
-
-	return string(availableLocales)
-}
-
-func IsLocaleAvailable(locale_type string) bool {
-	allAvailableLocales := getAllAvailableLocales()
-	locales := strings.Split(allAvailableLocales, "\n")
-
-	for _, v := range locales {
-		if locale_type == v {
-			return true
-		}
-	}
-	return false
 }
