@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
+	"github.com/greenplum-db/gpdb/gp/common"
 	"github.com/greenplum-db/gpdb/gp/constants"
 	"github.com/greenplum-db/gpdb/gp/hub"
 	"github.com/greenplum-db/gpdb/gp/idl"
@@ -17,11 +18,8 @@ import (
 )
 
 var (
-	ClusterParam    ClusterParams
-	primarySegments []Segment
-	Gparray         gpArray
-	execCommand     = exec.Command
-	force           bool
+	execCommand = exec.Command
+	force       bool
 )
 
 type InputConfig struct {
@@ -30,7 +28,7 @@ type InputConfig struct {
 	Encoding        string              `mapstructure:"encoding"`
 	HbaHostnames    bool                `mapstructure:"hba-hostnames"`
 	SuPassword      string              `mapstructure:"su-password"`
-	Locale          Locale              `mapstructure:"locale"`
+	Locale          common.Locale       `mapstructure:"locale"`
 	CommonConfig    map[string]string   `mapstructure:"common-config"`
 	CordConfig      map[string]string   `mapstructure:"coordinator-config"`
 	SegmentConfig   map[string]string   `mapstructure:"segment-config"`
@@ -38,40 +36,40 @@ type InputConfig struct {
 	PrimarySegments []map[string]string `mapstructure:"primary-segments-array"`
 }
 
-func SegmentToIdl(input Segment) *idl.Segment {
+func SegmentToIdl(input common.Segment) *idl.Segment {
 	segment := idl.Segment{}
-	segment.HostName = input.hostName
-	segment.HostAddress = input.hostAddress
-	segment.DataDirectory = input.dataDirectory
-	segment.Port = int32(input.port)
+	segment.HostName = input.HostName
+	segment.HostAddress = input.HostAddress
+	segment.DataDirectory = input.DataDirectory
+	segment.Port = int32(input.Port)
 	return &segment
 }
 
-func LoadClusterParams(input ClusterParams) *idl.ClusterParams {
+func LoadClusterParams(input *common.ClusterParams) *idl.ClusterParams {
 	clusterParam := new(idl.ClusterParams)
 	// Populate ClusterParams
-	clusterParam.HbaHostnames = input.hbaHostname
-	clusterParam.SuPassword = input.suPassword
-	clusterParam.Encoding = input.encoding
+	clusterParam.HbaHostnames = input.HbaHostname
+	clusterParam.SuPassword = input.SuPassword
+	clusterParam.Encoding = input.Encoding
 
-	clusterParam.DbName = input.dbname
+	clusterParam.DbName = input.DbName
 	clusterParam.CommonConfig = input.CommonConfig
 	clusterParam.CoordinatorConfig = input.CoordinatorConfig
 	clusterParam.SegmentConfig = input.SegmentConfig
 
-	// Load Locacle
+	// Load Locale
 	clusterParam.Locale = LoadLocale(input.Locale)
 	return clusterParam
 }
-func LoadLocale(param Locale) *idl.Locale {
+func LoadLocale(param common.Locale) *idl.Locale {
 	locale := new(idl.Locale)
-	locale.LcCollate = param.LcCollate
-	locale.LcAll = param.LcAll
-	locale.LcCtype = param.LcCtype
-	locale.LcMessages = param.LcMessages
-	locale.LcMonetory = param.LcMonetary
-	locale.LcTime = param.LcTime
-	locale.LcNumeric = param.LcNumeric
+	locale.LcCollate = param.Lc_collate
+	locale.LcAll = param.Lc_all
+	locale.LcCtype = param.Lc_ctype
+	locale.LcMessages = param.Lc_messages
+	locale.LcMonetory = param.Lc_monetory
+	locale.LcTime = param.Lc_time
+	locale.LcNumeric = param.Lc_numeric
 	return locale
 }
 
@@ -98,8 +96,7 @@ func initClusterCmd() *cobra.Command {
 		PreRunE: InitializeCommand,
 		RunE:    RunInitClusterCmd,
 	}
-	initClusterCmd.LocalFlags().Bool("force", false, "Create cluster forcefully by overwriting existing directories")
-	//force, _ := initClusterCmd.LocalFlags().GetBool("force")
+
 	// TODO `gp init <file>` command should also work. Current `gp init cluster <file>` is implemented
 	// TODO Add forced flag and populate to MakeClusterRequest
 	// TODO Check behavior when provided with no input file. Should give proper error message. Currently giving exception.
@@ -115,11 +112,9 @@ func InitClusterServiceFn(hubConfig *hub.Config, inputConfigFile string) error {
 		return err
 	}
 
-	if err := readInputConfig(inputConfigFile); err != nil {
-		return err
-	}
+	inputClusterParams, inputGpArray, err := readInputConfig(inputConfigFile)
 
-	if err := validateInputConfig(); err != nil {
+	if err := validateInputConfig(inputClusterParams, inputGpArray); err != nil {
 		return err
 	}
 
@@ -130,7 +125,7 @@ func InitClusterServiceFn(hubConfig *hub.Config, inputConfigFile string) error {
 	}
 
 	// TODO Populate clusterReq with data
-	clusterReq := LoadToIdl(Gparray, ClusterParam)
+	clusterReq := LoadToIdl(inputGpArray, inputClusterParams)
 
 	stream, err := client.MakeCluster(context.Background(), clusterReq)
 	if err != nil {
@@ -167,7 +162,7 @@ func InitClusterServiceFn(hubConfig *hub.Config, inputConfigFile string) error {
 	return nil
 }
 
-func LoadToIdl(gparray gpArray, param ClusterParams) *idl.MakeClusterRequest {
+func LoadToIdl(gparray *common.GpArray, param *common.ClusterParams) *idl.MakeClusterRequest {
 	clusterReq := idl.MakeClusterRequest{}
 	clusterReq.GpArray = &idl.GpArray{}
 	clusterReq.ClusterParams = &idl.ClusterParams{}
@@ -209,7 +204,7 @@ func RunInitClusterFn(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func readInputConfig(inputConfigFile string) error {
+func readInputConfig(inputConfigFile string) (*common.ClusterParams, *common.GpArray, error) {
 	viper.AddConfigPath(filepath.Dir(inputConfigFile))
 	viper.SetConfigName(filepath.Base(inputConfigFile))      // Register config file name (no extension)
 	viper.SetConfigType((filepath.Ext(inputConfigFile))[1:]) // Look for specific type
@@ -222,90 +217,94 @@ func readInputConfig(inputConfigFile string) error {
 		fmt.Printf("Error reading config file: %s\n", err)
 	}
 
-	ClusterParam.CoordinatorConfig = input.CordConfig
-	ClusterParam.SegmentConfig = input.SegmentConfig
-	ClusterParam.CommonConfig = input.CommonConfig
-	ClusterParam.Locale = input.Locale
-	ClusterParam.hbaHostname = input.HbaHostnames
-	ClusterParam.encoding = input.Encoding
-	ClusterParam.suPassword = input.SuPassword
+	var inputClusterParam common.ClusterParams
+	inputClusterParam.CoordinatorConfig = input.CordConfig
+	inputClusterParam.SegmentConfig = input.SegmentConfig
+	inputClusterParam.CommonConfig = input.CommonConfig
+	inputClusterParam.Locale = input.Locale
+	inputClusterParam.HbaHostname = input.HbaHostnames
+	inputClusterParam.Encoding = input.Encoding
+	inputClusterParam.SuPassword = input.SuPassword
 
 	// Copy primary segments
+	var primarySegments []common.Segment
 	for _, ps := range input.PrimarySegments {
-		var segment Segment
-		segment.hostName = ps["hostname"]
-		segment.hostAddress = ps["address"]
-		segment.dataDirectory = ps["data-directory"]
+		var segment common.Segment
+		segment.HostName = ps["hostname"]
+		segment.HostAddress = ps["address"]
+		segment.DataDirectory = ps["data-directory"]
 		port, err := strconv.Atoi(ps["port"])
 		if err != nil {
 			gplog.Error("Error converting port number from config file. Error:%v", err)
-			return err
+			return nil, nil, err
 		}
-		segment.port = port
+		segment.Port = port
 		primarySegments = append(primarySegments, segment)
 	}
-	Gparray.PrimarySegments = primarySegments
+	var inputGpArray common.GpArray
+
+	inputGpArray.PrimarySegments = primarySegments
 
 	// copy coordinator segment
 	port, err := strconv.Atoi(input.Coordinator["port"])
 	if err != nil {
 		gplog.Error("Error converting port number from config file. Error:%v", err)
-		return err
+		return nil, nil, err
 	}
-	coordinator := Segment{
-		hostName:      input.Coordinator["hostname"],
-		hostAddress:   input.Coordinator["address"],
-		dataDirectory: input.Coordinator["data-directory"],
-		port:          port,
+	coordinator := common.Segment{
+		HostName:      input.Coordinator["hostname"],
+		HostAddress:   input.Coordinator["address"],
+		DataDirectory: input.Coordinator["data-directory"],
+		Port:          port,
 	}
-	Gparray.Coordinator = coordinator
+	inputGpArray.Coordinator = coordinator
 
-	return nil
+	return &inputClusterParam, &inputGpArray, nil
 }
 
-func validateInputConfig() error {
-	if ClusterParam.CoordinatorConfig == nil {
-		ClusterParam.CoordinatorConfig = make(map[string]string)
+func validateInputConfig(inputClusterParams *common.ClusterParams, inputGpArray *common.GpArray) error {
+	if inputClusterParams.CoordinatorConfig == nil {
+		inputClusterParams.CoordinatorConfig = make(map[string]string)
 	}
-	if ClusterParam.SegmentConfig == nil {
-		ClusterParam.SegmentConfig = make(map[string]string)
+	if inputClusterParams.SegmentConfig == nil {
+		inputClusterParams.SegmentConfig = make(map[string]string)
 	}
-	if ClusterParam.CommonConfig == nil {
-		ClusterParam.CommonConfig = make(map[string]string)
+	if inputClusterParams.CommonConfig == nil {
+		inputClusterParams.CommonConfig = make(map[string]string)
 	}
 
 	/* TODO Check this checksum
-	if _, ok := ClusterParam.CommonConfig["heap-checksum"]; !ok {
+	if _, ok := inputClusterParams.CommonConfig["heap-checksum"]; !ok {
 		gplog.Info("Could not find HEAP_CHECKSUM in cluster config, defaulting to on.")
-		ClusterParam.CommonConfig["heap-checksum"] = "True"
+		inputClusterParams.CommonConfig["heap-checksum"] = "True"
 	}
 	*/
 
 	// Check if length of Gparray.PimarySegments is 0
-	if len(Gparray.PrimarySegments) == 0 {
+	if len(inputGpArray.PrimarySegments) == 0 {
 		gplog.Error("No primary segments are provided in input config file")
 	}
 
-	if ClusterParam.dbname == "" {
-		ClusterParam.dbname = constants.DefaultDB
+	if inputClusterParams.DbName == "" {
+		inputClusterParams.DbName = constants.DefaultDB
 		gplog.Info("Database name is not set, will set to default template1")
 	}
 
-	if ClusterParam.encoding == "" {
+	if inputClusterParams.Encoding == "" {
 		gplog.Info("Could not find encoding in cluster config, defaulting to UTF-8.")
-		ClusterParam.encoding = "UTF-8"
+		inputClusterParams.Encoding = "UTF-8"
 	}
 
-	if ClusterParam.encoding == "SQL_ASCII" {
+	if inputClusterParams.Encoding == "SQL_ASCII" {
 		gplog.Error("SQL_ASCII is no longer supported as a server encoding")
 	}
 
-	if _, ok := ClusterParam.CoordinatorConfig["max_connections"]; !ok {
-		gplog.Info("COORDINATOR max_connectionsT not set, will set to default value 150")
-		ClusterParam.CoordinatorConfig["max_connections"] = string(constants.DefaultQdMaxConnect)
+	if _, ok := inputClusterParams.CoordinatorConfig["max_connections"]; !ok {
+		gplog.Info("COORDINATOR max_connections not set, will set to default value 150")
+		inputClusterParams.CoordinatorConfig["max_connections"] = string(constants.DefaultQdMaxConnect)
 	}
 
-	coordinatorMaxConnect, err := strconv.Atoi(ClusterParam.CoordinatorConfig["max_connections"])
+	coordinatorMaxConnect, err := strconv.Atoi(inputClusterParams.CoordinatorConfig["max_connections"])
 	if err != nil {
 		return fmt.Errorf("error parsing max_connections from json: %v", err)
 	}
@@ -313,13 +312,13 @@ func validateInputConfig() error {
 	if coordinatorMaxConnect < 1 {
 		gplog.Error("COORDINATOR_MAX_CONNECT less than 1")
 	}
-	if _, ok := ClusterParam.SegmentConfig["max_connections"]; !ok {
-		ClusterParam.SegmentConfig["max_connections"] = string(coordinatorMaxConnect * constants.QeConnectFactor)
+	if _, ok := inputClusterParams.SegmentConfig["max_connections"]; !ok {
+		inputClusterParams.SegmentConfig["max_connections"] = string(coordinatorMaxConnect * constants.QeConnectFactor)
 	}
 
 	// check for shared_buffers if not provided in config then set the COORDINATOR_SHARED_BUFFERS and QE_SHARED_BUFFERS to DEFAULT_BUFFERS (128000 kB)
-	if _, ok := ClusterParam.CommonConfig["shared_buffers"]; !ok {
-		ClusterParam.CommonConfig["shared_buffers"] = constants.DefaultBuffer
+	if _, ok := inputClusterParams.CommonConfig["shared_buffers"]; !ok {
+		inputClusterParams.CommonConfig["shared_buffers"] = constants.DefaultBuffer
 		gplog.Info("shared_buffers is not set, will set to default value 128000kB")
 	}
 

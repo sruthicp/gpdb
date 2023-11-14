@@ -19,17 +19,17 @@ func (s *Segment) LoadFromIdl(input *idl.Segment) {
 }
 
 type Locale struct {
-	lc_all, lc_collate, lc_ctype, lc_messages, lc_monetory, lc_numeric, lc_time string
+	Lc_all, Lc_collate, Lc_ctype, Lc_messages, Lc_monetory, Lc_numeric, Lc_time string
 }
 
 func (l *Locale) LoadFromIdl(input *idl.Locale) {
-	l.lc_all = input.LcAll
-	l.lc_ctype = input.LcCtype
-	l.lc_collate = input.LcCollate
-	l.lc_messages = input.LcMessages
-	l.lc_monetory = input.LcMonetory
-	l.lc_numeric = input.LcNumeric
-	l.lc_time = input.LcTime
+	l.Lc_all = input.LcAll
+	l.Lc_ctype = input.LcCtype
+	l.Lc_collate = input.LcCollate
+	l.Lc_messages = input.LcMessages
+	l.Lc_monetory = input.LcMonetory
+	l.Lc_numeric = input.LcNumeric
+	l.Lc_time = input.LcTime
 }
 
 // Required only during creation of cluster
@@ -46,21 +46,21 @@ type ClusterParams struct {
 	CoordinatorIPlist []string
 
 	// more parameters
-	hbaHostname bool
-	encoding    string
-	suPassword  string
-	daName      string
+	HbaHostname bool
+	Encoding    string
+	SuPassword  string
+	DbName      string
 }
 
 func (c *ClusterParams) LoadFromIdl(input *idl.ClusterParams) {
 	c.SegmentConfig = input.SegmentConfig
 	c.CommonConfig = input.CommonConfig
 	c.CoordinatorConfig = input.CoordinatorConfig
-	c.encoding = input.Encoding
+	c.Encoding = input.Encoding
 	c.Locale.LoadFromIdl(input.Locale)
-	c.hbaHostname = input.HbaHostnames
-	c.suPassword = input.SuPassword
-	c.daName = input.DbName
+	c.HbaHostname = input.HbaHostnames
+	c.SuPassword = input.SuPassword
+	c.DbName = input.DbName
 }
 
 type GpArray struct {
