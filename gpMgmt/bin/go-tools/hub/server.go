@@ -37,6 +37,10 @@ var (
 
 type Dialer func(context.Context, string) (net.Conn, error)
 
+type streamSender interface {
+	Send(*idl.HubReply) error
+}
+
 type Config struct {
 	Port        int      `json:"hubPort"`
 	AgentPort   int      `json:"agentPort"`
@@ -59,65 +63,40 @@ type Server struct {
 	finish     chan struct{}
 }
 
-func ReplyLogMsg(msg string, server idl.Hub_MakeClusterServer) error {
-	logResponse := idl.MakeClusterReply_Message{
-		msg,
-	}
-	response := idl.MakeClusterReply{MakeClusterReply: &logResponse}
-	err := server.Send(&response)
-	if err != nil {
-		gplog.Error("Error replying MakeCluster RPC:%v", err)
-		return err
-	}
-	return nil
-}
-
-func ReplyProgress(msg string, percent int, server idl.Hub_MakeClusterServer) error {
-
-	progressMsg := idl.ProgressMessage{Title: msg, PercentProgress: int32(percent)}
-	progress := idl.MakeClusterReply_Progress{Progress: &progressMsg}
-	response := idl.MakeClusterReply{
-		MakeClusterReply: &progress,
-	}
-	err := server.Send(&response)
-	if err != nil {
-		gplog.Error("Error replying MakeCluster RPC:%v", err)
-		return err
-	}
-	return nil
-}
-
-func (s *Server) MakeCluster(request *idl.MakeClusterRequest, server idl.Hub_MakeClusterServer) error {
+func (s *Server) MakeCluster(request *idl.MakeClusterRequest, stream idl.Hub_MakeClusterServer) error {
 	gplog.Debug("Starting TestRPC")
 
-	err := ReplyLogMsg("Starting MakeCluster", server)
-	if err != nil {
-		return err
-	}
-
-	err = ReplyProgress("Validation", 0, server)
-	if err != nil {
-		return err
-	}
+	streamLogMsg(stream, "Starting MakeCluster")
 
 	var clusterParams common.ClusterParams
 	var gparray common.GpArray
 	clusterParams.LoadFromIdl(request.ClusterParams)
 	gparray.LoadFromIdl(request.GpArray)
 
-	err = s.MakeActualCluster(gparray, clusterParams, request.ForceFlag)
+	err := s.MakeActualCluster(gparray, clusterParams, request.ForceFlag)
 	if err != nil {
 		gplog.Error("Error during validation:%v", err)
 		return err
 	}
 
+	streamLogMsg(stream, "Creating coordinator segment")
 	err = CreateAndStartCoordinator(s.Conns, request.GpArray.Coordinator, request.ClusterParams)
 	if err != nil {
 		return err
 	}
+	streamLogMsg(stream, "Successfully created coordinator segment")
 
-	greenplum.RegisterCoordinator(request.GpArray.Coordinator)
-	greenplum.RegisterPrimaries(request.GpArray.Primaries, request.GpArray.Coordinator.HostName, int(request.GpArray.Coordinator.Port))
+	streamLogMsg(stream, "Starting to register primary segments with the coordinator")
+	err = greenplum.RegisterCoordinator(request.GpArray.Coordinator)
+	if err != nil {
+		return err
+	}
+
+	err = greenplum.RegisterPrimaries(request.GpArray.Primaries, request.GpArray.Coordinator.HostName, int(request.GpArray.Coordinator.Port))
+	if err != nil {
+		return err
+	}
+	streamLogMsg(stream, "Successfully registered primary segments with the coordinator")
 
 	gpArray := greenplum.NewGpArray()
 	err = gpArray.ReadGpSegmentConfig(request.GpArray.Coordinator.HostName, int(request.GpArray.Coordinator.Port))
@@ -130,31 +109,35 @@ func (s *Server) MakeCluster(request *idl.MakeClusterRequest, server idl.Hub_Mak
 		return err
 	}
 
-	err = CreateSegments(s.Conns, primarySegs, request.ClusterParams, []string{})
+	streamLogMsg(stream, "Creating primary segments")
+	err = CreateSegments(stream, s.Conns, primarySegs, request.ClusterParams, []string{})
 	if err != nil {
 		return err
 	}
+	streamLogMsg(stream, "Successfully created primary segments")
 
 	// We do not start the primary segments, only the coordinator.
 	// Only in case of mirrors, we start them at the end after gpstop/gpstart
 	// err = StartSegments(s.Conns, primarySegs, "-c gp_role=utility")
 
-	gpstopOptions := greenplum.GpStop{
+	streamLogMsg(stream, "Restarting the Greenplum cluster in production mode")
+	gpstopOptions := &greenplum.GpStop{
 		DataDirectory:   request.GpArray.Coordinator.DataDirectory,
 		CoordinatorOnly: true,
 	}
-	out, err := greenplum.RunGpCommand(&gpstopOptions, s.GpHome)
+	err = streamGpCommand(stream, gpstopOptions, s.GpHome)
 	if err != nil {
-		return fmt.Errorf("executing gpstop: %s, %w", out, err)
+		return fmt.Errorf("executing gpstop: %w", err)
 	}
 
-	gpstartOptions := greenplum.GpStart{
+	gpstartOptions := &greenplum.GpStart{
 		DataDirectory: request.GpArray.Coordinator.DataDirectory,
 	}
-	out, err = greenplum.RunGpCommand(&gpstartOptions, s.GpHome)
+	err = streamGpCommand(stream, gpstartOptions, s.GpHome)
 	if err != nil {
-		return fmt.Errorf("executing gpstart: %s, %w", out, err)
+		return fmt.Errorf("executing gpstart: %w", err)
 	}
+	streamLogMsg(stream, "Completed restart of Greenplum cluster in production mode")
 
 	// TODO
 	// 1. CREATE_GPEXTENSIONS
@@ -509,6 +492,80 @@ func getConnByHost(conns []*Connection, hostnames []string) []*Connection {
 	}
 
 	return result
+}
+
+func streamLogMsg(stream streamSender, msg string) {
+	message := &idl.HubReply{
+		Message: &idl.HubReply_LogMsg{
+			LogMsg: msg,
+		},
+	}
+
+	err := stream.Send(message)
+	if err != nil {
+		gplog.Error("unable to stream message %q: %s", message, err)
+	}
+}
+
+func streamStdoutMsg(stream streamSender, msg string) {
+	message := &idl.HubReply{
+		Message: &idl.HubReply_StdoutMsg{
+			StdoutMsg: msg,
+		},
+	}
+
+	err := stream.Send(message)
+	if err != nil {
+		gplog.Error("unable to stream message %q: %s", message, err)
+	}
+}
+
+func streamGpCommand(stream streamSender, gpCmd greenplum.GpCommand, gphome string) error {
+	cmd := greenplum.NewGpCommand(gpCmd, gphome)
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+
+	gplog.Debug("Executing command: %s", cmd.String())
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	buf := make([]byte, 1024)
+	for {
+		n, err := stdout.Read(buf)
+		if err != nil {
+			break
+		}
+
+		output := string(buf[:n])
+		streamStdoutMsg(stream, output)
+	}
+
+	if err := cmd.Wait(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func streamProgressMsg(stream streamSender, label string, total int) {
+
+	message := &idl.HubReply{
+		Message: &idl.HubReply_ProgressMsg{
+			ProgressMsg: &idl.ProgressMessage{
+				Label:     label,
+				Total:     int32(total),
+			},
+		},
+	}
+
+	err := stream.Send(message)
+	if err != nil {
+		gplog.Error("unable to stream message %q: %s", message, err)
+	}
 }
 
 // used only for testing

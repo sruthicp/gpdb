@@ -12,7 +12,6 @@ import (
 
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/greenplum-db/gpdb/gp/common"
-	"github.com/greenplum-db/gpdb/gp/errorlist"
 	"github.com/greenplum-db/gpdb/gp/idl"
 	"github.com/greenplum-db/gpdb/gp/utils"
 	"github.com/greenplum-db/gpdb/gp/utils/greenplum"
@@ -85,7 +84,7 @@ func (s *Server) ValidateOnAllHost(hostDirMap map[string][]string, forced bool) 
 	close(errs)
 	var err1 error
 	for e := range errs {
-		err1 = errorlist.Append(err1, e)
+		err1 = errors.Join(err1, e)
 	}
 	return err1
 }
@@ -129,11 +128,11 @@ func CreateSingleSegment(conn *Connection, seg *idl.Segment, clusterParams *idl.
 	}
 
 	makeSegmentReq := &idl.MakeSegmentRequest{
-		Segment: seg,
-		Locale: clusterParams.Locale,
-		Encoding: clusterParams.Encoding,
-		SegConfig: pgConfig,
-		IPList: addressList,
+		Segment:      seg,
+		Locale:       clusterParams.Locale,
+		Encoding:     clusterParams.Encoding,
+		SegConfig:    pgConfig,
+		IPList:       addressList,
 		HbaHostNames: clusterParams.HbaHostnames,
 	}
 
@@ -158,7 +157,7 @@ func CreateAndStartCoordinator(conns []*Connection, seg *idl.Segment, clusterPar
 
 		startSegReq := &idl.StartSegmentRequest{
 			DataDir: seg.DataDirectory,
-			Wait: true,
+			Wait:    true,
 			Options: "-c gp_role=utility",
 		}
 		_, err = conn.AgentClient.StartSegment(context.Background(), startSegReq)
@@ -169,16 +168,16 @@ func CreateAndStartCoordinator(conns []*Connection, seg *idl.Segment, clusterPar
 	return ExecuteRPC(coordinatorConn, request)
 }
 
-func CreateSegments(conns []*Connection, segs []greenplum.Segment, clusterParams *idl.ClusterParams, addressList []string) error {
+func CreateSegments(stream idl.Hub_MakeClusterServer, conns []*Connection, segs []greenplum.Segment, clusterParams *idl.ClusterParams, addressList []string) error {
 	hostSegmentMap := map[string][]*idl.Segment{}
 	for _, seg := range segs {
 		segReq := &idl.Segment{
-			Port: int32(seg.Port),
+			Port:          int32(seg.Port),
 			DataDirectory: seg.DataDirectory,
-			HostName: seg.HostName,
-			HostAddress: seg.HostAddress,
-			Contentid: int32(seg.ContentId),
-			Dbid: int32(seg.Dbid),
+			HostName:      seg.HostName,
+			HostAddress:   seg.HostAddress,
+			Contentid:     int32(seg.ContentId),
+			Dbid:          int32(seg.Dbid),
 		}
 
 		if _, ok := hostSegmentMap[seg.HostName]; !ok {
@@ -187,6 +186,10 @@ func CreateSegments(conns []*Connection, segs []greenplum.Segment, clusterParams
 			hostSegmentMap[seg.HostName] = append(hostSegmentMap[seg.HostName], segReq)
 		}
 	}
+	
+	progressLabel := "Initializing segments:"
+	progressTotal := len(segs)
+	streamProgressMsg(stream, progressLabel, progressTotal)
 
 	request := func(conn *Connection) error {
 		var wg sync.WaitGroup
@@ -202,6 +205,8 @@ func CreateSegments(conns []*Connection, segs []greenplum.Segment, clusterParams
 				err := CreateSingleSegment(conn, seg, clusterParams, addressList)
 				if err != nil {
 					errs <- utils.FormatGrpcError(err)
+				} else {
+					streamProgressMsg(stream, progressLabel, progressTotal)
 				}
 			}(seg)
 		}
@@ -238,7 +243,7 @@ func StartSegments(conns []*Connection, segs []greenplum.Segment, options string
 			seg := seg
 			startReq := &idl.StartSegmentRequest{
 				DataDir: seg.DataDirectory,
-				Wait: true,
+				Wait:    true,
 				Timeout: 600,
 				Options: options,
 			}

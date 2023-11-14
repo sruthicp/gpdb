@@ -21,18 +21,17 @@ type GpCommand interface {
 }
 
 func NewGpCommand(gpCmd GpCommand, gphome string) *exec.Cmd {
-	return gpCmd.buildGpCommand(gphome)
+	cmd := gpCmd.buildGpCommand(gphome)
+	gpSourceFile := filepath.Join(gphome, "greenplum_path.sh")
+
+	return utils.System.ExecCommand("bash", "-c", fmt.Sprintf("source %s && %s", gpSourceFile, cmd.String()))
 }
 
 func RunGpCommand(gpCmd GpCommand, gphome string) (*bytes.Buffer, error) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	newGpCmd := NewGpCommand(gpCmd, gphome)
-
-	// Source greenplum_path.sh
-	gpSourceFile := filepath.Join(gphome, "greenplum_path.sh")
-	cmd := utils.System.ExecCommand("bash", "-c", fmt.Sprintf("source %s && %s", gpSourceFile, newGpCmd.String()))
+	cmd := NewGpCommand(gpCmd, gphome)
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 

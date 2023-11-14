@@ -9,7 +9,7 @@ service Hub {
     rpc StartAgents(StartAgentsRequest) returns (StartAgentsReply) {}
     rpc StatusAgents(StatusAgentsRequest) returns (StatusAgentsReply) {}
     rpc StopAgents(StopAgentsRequest) returns (StopAgentsReply) {}
-    rpc MakeCluster(MakeClusterRequest) returns(stream MakeClusterReply) {}
+    rpc MakeCluster(MakeClusterRequest) returns (stream HubReply) {}
 }
 
 message StopHubRequest {}
@@ -42,16 +42,17 @@ message MakeClusterRequest {
     bool forceFlag = 3;
 }
 
-message MakeClusterReply {
-    oneof makeClusterReply {
-        string message=1;
-        ProgressMessage progress = 2;
+message HubReply {
+    oneof message {
+        string logMsg = 1;
+        string stdoutMsg = 2;
+        ProgressMessage progressMsg = 3;
     };
 }
 
 message ProgressMessage {
-    string title = 1;
-    int32 percentProgress = 2;
+    string label = 2;
+    int32 total = 4;
 }
 
 message gpArray {

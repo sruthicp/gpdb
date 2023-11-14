@@ -3,18 +3,20 @@ package cli
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
+
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/greenplum-db/gpdb/gp/common"
 	"github.com/greenplum-db/gpdb/gp/constants"
 	"github.com/greenplum-db/gpdb/gp/hub"
 	"github.com/greenplum-db/gpdb/gp/idl"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	"io"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strconv"
+	"github.com/greenplum-db/gpdb/gp/utils"
 )
 
 var (
@@ -129,36 +131,14 @@ func InitClusterServiceFn(hubConfig *hub.Config, inputConfigFile string) error {
 
 	stream, err := client.MakeCluster(context.Background(), clusterReq)
 	if err != nil {
-		gplog.Error("Error calling hub to create cluster:%v", err)
-		return fmt.Errorf("error calling hub to create cluster:%v", err)
+		return utils.FormatGrpcError(err)
 	}
-	done := make(chan bool)
-	go func() {
-		for {
-			resp, err := stream.Recv()
-			if err == io.EOF {
-				gplog.Debug("MakeCluster connection closed. Done.")
-				fmt.Println("MakeCluster connection closed. Done.")
-				done <- true
-				return
-			}
-			if err != nil {
-				fmt.Printf("Error:%v\n", err)
-				done <- true
-				return
-			}
-			reply := resp.MakeClusterReply
-			switch reply.(type) {
-			case *idl.MakeClusterReply_Message:
-				fmt.Printf("Message:%s\n", resp.GetMessage())
-			case *idl.MakeClusterReply_Progress:
-				fmt.Printf("Progress, Title:%s Progreess:%d\n", resp.GetProgress().GetTitle(), resp.GetProgress().GetPercentProgress())
-			}
-		}
-	}()
-	<-done
 
-	fmt.Println("Done with Make Cluster. Exiting.")
+	err = ParseStreamResponse(stream)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -301,7 +281,7 @@ func validateInputConfig(inputClusterParams *common.ClusterParams, inputGpArray 
 
 	if _, ok := inputClusterParams.CoordinatorConfig["max_connections"]; !ok {
 		gplog.Info("COORDINATOR max_connections not set, will set to default value 150")
-		inputClusterParams.CoordinatorConfig["max_connections"] = string(constants.DefaultQdMaxConnect)
+		inputClusterParams.CoordinatorConfig["max_connections"] = strconv.Itoa(constants.DefaultQdMaxConnect)
 	}
 
 	coordinatorMaxConnect, err := strconv.Atoi(inputClusterParams.CoordinatorConfig["max_connections"])
@@ -313,7 +293,7 @@ func validateInputConfig(inputClusterParams *common.ClusterParams, inputGpArray 
 		gplog.Error("COORDINATOR_MAX_CONNECT less than 1")
 	}
 	if _, ok := inputClusterParams.SegmentConfig["max_connections"]; !ok {
-		inputClusterParams.SegmentConfig["max_connections"] = string(coordinatorMaxConnect * constants.QeConnectFactor)
+		inputClusterParams.SegmentConfig["max_connections"] = strconv.Itoa(coordinatorMaxConnect * constants.QeConnectFactor)
 	}
 
 	// check for shared_buffers if not provided in config then set the COORDINATOR_SHARED_BUFFERS and QE_SHARED_BUFFERS to DEFAULT_BUFFERS (128000 kB)

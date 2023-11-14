@@ -1,8 +1,8 @@
 package utils
 
 import (
-	"github.com/vbauerster/mpb"
-	"github.com/vbauerster/mpb/decor"
+	"github.com/vbauerster/mpb/v8"
+	"github.com/vbauerster/mpb/v8/decor"
 )
 
 func NewProgressInstance() *mpb.Progress {
