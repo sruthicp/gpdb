@@ -20,7 +20,6 @@ import (
 	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
-	"github.com/greenplum-db/gpdb/gp/common"
 	"github.com/greenplum-db/gpdb/gp/constants"
 	"github.com/greenplum-db/gpdb/gp/idl"
 	"github.com/greenplum-db/gpdb/gp/testutils/exectest"
@@ -61,91 +60,6 @@ type Server struct {
 	grpcServer *grpc.Server
 	listener   net.Listener
 	finish     chan struct{}
-}
-
-func (s *Server) MakeCluster(request *idl.MakeClusterRequest, stream idl.Hub_MakeClusterServer) error {
-	gplog.Debug("Starting TestRPC")
-
-	streamLogMsg(stream, "Starting MakeCluster")
-
-	var clusterParams common.ClusterParams
-	var gparray common.GpArray
-	clusterParams.LoadFromIdl(request.ClusterParams)
-	gparray.LoadFromIdl(request.GpArray)
-
-	err := s.MakeActualCluster(gparray, clusterParams, request.ForceFlag)
-	if err != nil {
-		gplog.Error("Error during validation:%v", err)
-		return err
-	}
-
-	streamLogMsg(stream, "Creating coordinator segment")
-	err = CreateAndStartCoordinator(s.Conns, request.GpArray.Coordinator, request.ClusterParams)
-	if err != nil {
-		return err
-	}
-	streamLogMsg(stream, "Successfully created coordinator segment")
-
-	streamLogMsg(stream, "Starting to register primary segments with the coordinator")
-	err = greenplum.RegisterCoordinator(request.GpArray.Coordinator)
-	if err != nil {
-		return err
-	}
-
-	err = greenplum.RegisterPrimaries(request.GpArray.Primaries, request.GpArray.Coordinator.HostName, int(request.GpArray.Coordinator.Port))
-	if err != nil {
-		return err
-	}
-	streamLogMsg(stream, "Successfully registered primary segments with the coordinator")
-
-	gpArray := greenplum.NewGpArray()
-	err = gpArray.ReadGpSegmentConfig(request.GpArray.Coordinator.HostName, int(request.GpArray.Coordinator.Port))
-	if err != nil {
-		return err
-	}
-
-	primarySegs, err := gpArray.GetPrimarySegments()
-	if err != nil {
-		return err
-	}
-
-	streamLogMsg(stream, "Creating primary segments")
-	err = CreateSegments(stream, s.Conns, primarySegs, request.ClusterParams, []string{})
-	if err != nil {
-		return err
-	}
-	streamLogMsg(stream, "Successfully created primary segments")
-
-	// We do not start the primary segments, only the coordinator.
-	// Only in case of mirrors, we start them at the end after gpstop/gpstart
-	// err = StartSegments(s.Conns, primarySegs, "-c gp_role=utility")
-
-	streamLogMsg(stream, "Restarting the Greenplum cluster in production mode")
-	gpstopOptions := &greenplum.GpStop{
-		DataDirectory:   request.GpArray.Coordinator.DataDirectory,
-		CoordinatorOnly: true,
-	}
-	err = streamGpCommand(stream, gpstopOptions, s.GpHome)
-	if err != nil {
-		return fmt.Errorf("executing gpstop: %w", err)
-	}
-
-	gpstartOptions := &greenplum.GpStart{
-		DataDirectory: request.GpArray.Coordinator.DataDirectory,
-	}
-	err = streamGpCommand(stream, gpstartOptions, s.GpHome)
-	if err != nil {
-		return fmt.Errorf("executing gpstart: %w", err)
-	}
-	streamLogMsg(stream, "Completed restart of Greenplum cluster in production mode")
-
-	// TODO
-	// 1. CREATE_GPEXTENSIONS
-	// 2. IMPORT_COLLATION
-	// 3. CREATE_DATABASE
-	// 4. SET_GP_USER_PW
-
-	return err
 }
 
 type Connection struct {
@@ -470,7 +384,7 @@ func copyConfigFileToAgents(conf *Config, ConfigFilePath string) error {
 	}
 	greenplumPathSh := filepath.Join(conf.GpHome, "greenplum_path.sh")
 	if len(hostList) < 1 {
-		return fmt.Errorf("hostlist should not be empty. No hosts to copy files.")
+		return fmt.Errorf("hostlist should not be empty. No hosts to copy files")
 	}
 
 	remoteCmd := append(hostList, ConfigFilePath, fmt.Sprintf("=:%s", ConfigFilePath))
@@ -556,8 +470,8 @@ func streamProgressMsg(stream streamSender, label string, total int) {
 	message := &idl.HubReply{
 		Message: &idl.HubReply_ProgressMsg{
 			ProgressMsg: &idl.ProgressMessage{
-				Label:     label,
-				Total:     int32(total),
+				Label: label,
+				Total: int32(total),
 			},
 		},
 	}
@@ -568,7 +482,7 @@ func streamProgressMsg(stream streamSender, label string, total int) {
 	}
 }
 
-// used only for testing
+// SetEnsureConnectionsAreReady used only for testing
 func SetEnsureConnectionsAreReady(customFunc func(conns []*Connection) error) {
 	ensureConnectionsAreReadyFunc = customFunc
 }

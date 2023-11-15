@@ -11,45 +11,117 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
-	"github.com/greenplum-db/gpdb/gp/common"
 	"github.com/greenplum-db/gpdb/gp/idl"
 	"github.com/greenplum-db/gpdb/gp/utils"
 	"github.com/greenplum-db/gpdb/gp/utils/greenplum"
 )
 
-func (s *Server) MakeActualCluster(gparray common.GpArray, params common.ClusterParams, forced bool) error {
-	//Makes actual cluster
-	gplog.Info("Starting MakeActualCluster")
-	gplog.Debug("GPArray:%#v", gparray)
-	gplog.Debug("ClusterParams:%#v", params)
-	gplog.Debug("Forced:%t", forced)
-	// TODO Validate Parameters and gpArray
+func (s *Server) MakeCluster(request *idl.MakeClusterRequest, stream idl.Hub_MakeClusterServer) error {
+	gplog.Debug("Starting MakeCluster")
 
+	streamLogMsg(stream, "Starting MakeCluster")
+
+	err := s.ValidateEnvironment(request)
+	if err != nil {
+		gplog.Error("Error during validation:%v", err)
+		return err
+	}
+
+	streamLogMsg(stream, "Creating coordinator segment")
+	err = CreateAndStartCoordinator(s.Conns, request.GpArray.Coordinator, request.ClusterParams)
+	if err != nil {
+		return err
+	}
+	streamLogMsg(stream, "Successfully created coordinator segment")
+
+	streamLogMsg(stream, "Starting to register primary segments with the coordinator")
+	err = greenplum.RegisterCoordinator(request.GpArray.Coordinator)
+	if err != nil {
+		return err
+	}
+
+	err = greenplum.RegisterPrimaries(request.GpArray.Primaries, request.GpArray.Coordinator.HostName, int(request.GpArray.Coordinator.Port))
+	if err != nil {
+		return err
+	}
+	streamLogMsg(stream, "Successfully registered primary segments with the coordinator")
+
+	gpArray := greenplum.NewGpArray()
+	err = gpArray.ReadGpSegmentConfig(request.GpArray.Coordinator.HostName, int(request.GpArray.Coordinator.Port))
+	if err != nil {
+		return err
+	}
+
+	primarySegs, err := gpArray.GetPrimarySegments()
+	if err != nil {
+		return err
+	}
+
+	streamLogMsg(stream, "Creating primary segments")
+	err = CreateSegments(stream, s.Conns, primarySegs, request.ClusterParams, []string{})
+	if err != nil {
+		return err
+	}
+	streamLogMsg(stream, "Successfully created primary segments")
+
+	// We do not start the primary segments, only the coordinator.
+	// Only in case of mirrors, we start them at the end after gpstop/gpstart
+	// err = StartSegments(s.Conns, primarySegs, "-c gp_role=utility")
+
+	streamLogMsg(stream, "Restarting the Greenplum cluster in production mode")
+	gpstopOptions := &greenplum.GpStop{
+		DataDirectory:   request.GpArray.Coordinator.DataDirectory,
+		CoordinatorOnly: true,
+	}
+	err = streamGpCommand(stream, gpstopOptions, s.GpHome)
+	if err != nil {
+		return fmt.Errorf("executing gpstop: %w", err)
+	}
+
+	gpstartOptions := &greenplum.GpStart{
+		DataDirectory: request.GpArray.Coordinator.DataDirectory,
+	}
+	err = streamGpCommand(stream, gpstartOptions, s.GpHome)
+	if err != nil {
+		return fmt.Errorf("executing gpstart: %w", err)
+	}
+	streamLogMsg(stream, "Completed restart of Greenplum cluster in production mode")
+
+	// TODO
+	// 1. CREATE_GPEXTENSIONS
+	// 2. IMPORT_COLLATION
+	// 3. CREATE_DATABASE
+	// 4. SET_GP_USER_PW
+
+	return err
+}
+
+func (s *Server) ValidateEnvironment(request *idl.MakeClusterRequest) error {
 	// Check and validate environment for each segment
-	// create list of directories per host
-	gplog.Debug("Building hostDirMap. PrimarySegs:%d", len(gparray.PrimarySegments))
+	gparray := request.GpArray
+	gplog.Info("Starting ValidateEnvironment")
+	// TODO Validate Parameters and gpArray populated
+
 	hostDirMap := make(map[string][]string)
 	// Add coordinator to the map
 	hostDirMap[gparray.Coordinator.HostAddress] = append(hostDirMap[gparray.Coordinator.HostAddress], gparray.Coordinator.DataDirectory)
 
 	// Add primaries to the map
-	for _, seg := range gparray.PrimarySegments {
-		gplog.Debug("HostAddress: %s, Dir:%s", seg.HostAddress, seg.DataDirectory)
+	for _, seg := range gparray.Primaries {
 		hostDirMap[seg.HostAddress] = append(hostDirMap[seg.HostAddress], seg.DataDirectory)
 	}
-	gplog.Debug("Created Host-Dir Map")
+
+	// Connect to all agents
 	err := s.DialAllAgents()
 	if err != nil {
 		gplog.Error("Error in DialAllAgents:%v", err)
-		return err
+		return fmt.Errorf("error while connecting Agents:%v", err)
 	}
-	gplog.Debug("Done with DialAllAgents successfully")
-	err = s.ValidateOnAllHost(hostDirMap, forced)
+	err = s.ValidateOnAllHost(hostDirMap, request.ForceFlag)
 	if err != nil {
 		return err
 	}
-	//
-	gplog.Info("Exiting MakeActualCluster")
+	gplog.Info("Done with ValidateEnvironment")
 
 	return nil
 }
@@ -186,7 +258,7 @@ func CreateSegments(stream idl.Hub_MakeClusterServer, conns []*Connection, segs 
 			hostSegmentMap[seg.HostName] = append(hostSegmentMap[seg.HostName], segReq)
 		}
 	}
-	
+
 	progressLabel := "Initializing segments:"
 	progressTotal := len(segs)
 	streamProgressMsg(stream, progressLabel, progressTotal)
