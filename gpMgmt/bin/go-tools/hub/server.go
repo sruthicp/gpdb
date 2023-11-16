@@ -24,7 +24,6 @@ import (
 	"github.com/greenplum-db/gpdb/gp/idl"
 	"github.com/greenplum-db/gpdb/gp/testutils/exectest"
 	"github.com/greenplum-db/gpdb/gp/utils"
-	"github.com/greenplum-db/gpdb/gp/utils/greenplum"
 )
 
 var (
@@ -434,10 +433,13 @@ func streamStdoutMsg(stream streamSender, msg string) {
 	}
 }
 
-func streamGpCommand(stream streamSender, gpCmd greenplum.GpCommand, gphome string) error {
-	cmd := greenplum.NewGpCommand(gpCmd, gphome)
-
+func streamExecCommand(stream streamSender, cmd *exec.Cmd, gphome string) error {
 	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	
+	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		return err
 	}
@@ -447,16 +449,31 @@ func streamGpCommand(stream streamSender, gpCmd greenplum.GpCommand, gphome stri
 		return err
 	}
 
-	buf := make([]byte, 1024)
-	for {
-		n, err := stdout.Read(buf)
-		if err != nil {
-			break
-		}
+	go func ()  {
+		buf := make([]byte, 1024)
+		for {
+			n, err := stdout.Read(buf)
+			if err != nil {
+				break
+			}
 
-		output := string(buf[:n])
-		streamStdoutMsg(stream, output)
-	}
+			output := string(buf[:n])
+			streamStdoutMsg(stream, output)
+		}
+	}()
+
+	go func ()  {
+		buf := make([]byte, 1024)
+		for {
+			n, err := stderr.Read(buf)
+			if err != nil {
+				break
+			}
+
+			output := string(buf[:n])
+			streamStdoutMsg(stream, output)
+		}
+	}()
 
 	if err := cmd.Wait(); err != nil {
 		return err

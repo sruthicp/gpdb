@@ -28,7 +28,7 @@ func (s *Server) MakeCluster(request *idl.MakeClusterRequest, stream idl.Hub_Mak
 	}
 
 	streamLogMsg(stream, "Creating coordinator segment")
-	err = CreateAndStartCoordinator(s.Conns, request.GpArray.Coordinator, request.ClusterParams)
+	err = s.CreateAndStartCoordinator(request.GpArray.Coordinator, request.ClusterParams)
 	if err != nil {
 		return err
 	}
@@ -58,7 +58,7 @@ func (s *Server) MakeCluster(request *idl.MakeClusterRequest, stream idl.Hub_Mak
 	}
 
 	streamLogMsg(stream, "Creating primary segments")
-	err = CreateSegments(stream, s.Conns, primarySegs, request.ClusterParams, []string{})
+	err = s.CreateSegments(stream, primarySegs, request.ClusterParams, []string{})
 	if err != nil {
 		return err
 	}
@@ -73,7 +73,8 @@ func (s *Server) MakeCluster(request *idl.MakeClusterRequest, stream idl.Hub_Mak
 		DataDirectory:   request.GpArray.Coordinator.DataDirectory,
 		CoordinatorOnly: true,
 	}
-	err = streamGpCommand(stream, gpstopOptions, s.GpHome)
+	cmd := utils.NewGpSourcedCommand(gpstopOptions, s.GpHome)
+	err = streamExecCommand(stream, cmd, s.GpHome)
 	if err != nil {
 		return fmt.Errorf("executing gpstop: %w", err)
 	}
@@ -81,7 +82,8 @@ func (s *Server) MakeCluster(request *idl.MakeClusterRequest, stream idl.Hub_Mak
 	gpstartOptions := &greenplum.GpStart{
 		DataDirectory: request.GpArray.Coordinator.DataDirectory,
 	}
-	err = streamGpCommand(stream, gpstartOptions, s.GpHome)
+	cmd = utils.NewGpSourcedCommand(gpstartOptions, s.GpHome)
+	err = streamExecCommand(stream, cmd, s.GpHome)
 	if err != nil {
 		return fmt.Errorf("executing gpstart: %w", err)
 	}
@@ -216,8 +218,8 @@ func CreateSingleSegment(conn *Connection, seg *idl.Segment, clusterParams *idl.
 	return nil
 }
 
-func CreateAndStartCoordinator(conns []*Connection, seg *idl.Segment, clusterParams *idl.ClusterParams) error {
-	coordinatorConn := getConnByHost(conns, []string{seg.HostName})
+func (s *Server) CreateAndStartCoordinator(seg *idl.Segment, clusterParams *idl.ClusterParams) error {
+	coordinatorConn := getConnByHost(s.Conns, []string{seg.HostName})
 
 	seg.Contentid = -1
 	seg.Dbid = 1
@@ -240,7 +242,7 @@ func CreateAndStartCoordinator(conns []*Connection, seg *idl.Segment, clusterPar
 	return ExecuteRPC(coordinatorConn, request)
 }
 
-func CreateSegments(stream idl.Hub_MakeClusterServer, conns []*Connection, segs []greenplum.Segment, clusterParams *idl.ClusterParams, addressList []string) error {
+func (s *Server) CreateSegments(stream idl.Hub_MakeClusterServer, segs []greenplum.Segment, clusterParams *idl.ClusterParams, addressList []string) error {
 	hostSegmentMap := map[string][]*idl.Segment{}
 	for _, seg := range segs {
 		segReq := &idl.Segment{
@@ -293,7 +295,7 @@ func CreateSegments(stream idl.Hub_MakeClusterServer, conns []*Connection, segs 
 		return err
 	}
 
-	return ExecuteRPC(conns, request)
+	return ExecuteRPC(s.Conns, request)
 }
 
 func StartSegments(conns []*Connection, segs []greenplum.Segment, options string) error {

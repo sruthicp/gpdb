@@ -6,7 +6,10 @@ import (
 )
 
 func NewProgressInstance() *mpb.Progress {
-	return mpb.New(mpb.WithWidth(64))
+	return mpb.New(
+		mpb.WithWidth(64),
+		mpb.PopCompletedMode(),
+	)
 }
 
 func NewProgressBar(instance *mpb.Progress, label string, size int) *mpb.Bar {

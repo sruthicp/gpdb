@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/greenplum-db/gpdb/gp/idl"
+	"github.com/greenplum-db/gpdb/gp/utils"
 	"github.com/greenplum-db/gpdb/gp/utils/postgres"
 )
 
@@ -17,7 +18,7 @@ func (s *Server) StartSegment(ctx context.Context, in *idl.StartSegmentRequest) 
 		Options: in.Options,
 		Logfile: filepath.Join(in.DataDir, "log", "startup.log"),
 	}
-	out, err := postgres.RunPgCommand(&pgCtlStartOptions, s.GpHome)
+	out, err := utils.RunExecCommand(&pgCtlStartOptions, s.GpHome)
 	if err != nil {
 		return &idl.StartSegmentReply{}, fmt.Errorf("executing pg_ctl start: %s, %w", out, err)
 	}

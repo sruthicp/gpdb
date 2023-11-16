@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/greenplum-db/gpdb/gp/idl"
@@ -34,15 +35,9 @@ func ParseStreamResponse(stream streamReceiver) error {
 		msg := resp.Message
 		switch msg.(type) {
 		case *idl.HubReply_LogMsg:
-			if len(progressBarMap) != 0 {
-				progressInstance.Wait()				
-			}
 			gplog.Info(resp.GetLogMsg())
 
 		case *idl.HubReply_StdoutMsg:
-			if len(progressBarMap) != 0 {
-				progressInstance.Wait()				
-			}
 			fmt.Print(resp.GetStdoutMsg())
 
 		case *idl.HubReply_ProgressMsg:
@@ -50,12 +45,18 @@ func ParseStreamResponse(stream streamReceiver) error {
 			if _, ok := progressBarMap[progressMsg.Label]; !ok {
 				progressBarMap[progressMsg.Label] = utils.NewProgressBar(progressInstance, progressMsg.Label, int(progressMsg.Total))
 			} else {
-				progressBarMap[progressMsg.Label].Increment()
+				bar := progressBarMap[progressMsg.Label]
+				bar.Increment()
+
+				if bar.Current() == int64(progressMsg.Total) {
+					bar.Wait()
+					time.Sleep(500 * time.Millisecond)
+				}
 			}
 		}
 	}
 
 	progressInstance.Wait()
-	
+
 	return nil
 }

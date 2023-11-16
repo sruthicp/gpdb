@@ -99,6 +99,7 @@ func UpdateCoordinatorPgHbaConf(pgdata string, hbaHostnames bool, hostname strin
 	gplog.Info("Successfully updated %s for data directory %s", pgHbaConfFile, pgdata)
 	return nil
 }
+
 func UpdateSegmentPgHbaConf(pgdata string, hbaHostnames bool, coordinatorAddrs []string, hostname string) error {
 	pgHbaFilePath := filepath.Join(pgdata, pgHbaConfFile)
 

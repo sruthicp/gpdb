@@ -28,7 +28,7 @@ func TestPgCommand(t *testing.T) {
 	_, _, logfile := testhelper.SetupTestLogger()
 	
 	cases := []struct{
-		pgCmdOptions postgres.PgCommand
+		pgCmdOptions utils.CommandBuilder
 		expected string
 	}{
 		{
@@ -54,7 +54,7 @@ func TestPgCommand(t *testing.T) {
 	
 	for _, tc := range cases {
 		t.Run("builds the correct command", func(t *testing.T) {
-			pgCmd := postgres.NewPgCommand(tc.pgCmdOptions, "gphome")
+			pgCmd := utils.NewExecCommand(tc.pgCmdOptions, "gphome")
 			if pgCmd.String() != tc.expected {
 				t.Fatalf("got %s, want %s", pgCmd.String(), tc.expected)
 			}
@@ -69,7 +69,7 @@ func TestPgCommand(t *testing.T) {
 			PgData: "pgdata",
 			Encoding: "encoding",
 		}
-		out, err := postgres.RunPgCommand(pgCmdOptions, "gphome")
+		out, err := utils.RunExecCommand(pgCmdOptions, "gphome")
 		if err != nil {
 			t.Fatalf("unexpected error: %#v", err)
 		}
@@ -90,7 +90,7 @@ func TestPgCommand(t *testing.T) {
 			PgData: "pgdata",
 			Encoding: "encoding",
 		}
-		out, err := postgres.RunPgCommand(pgCmdOptions, "gphome")
+		out, err := utils.RunExecCommand(pgCmdOptions, "gphome")
 		if status, ok := err.(*exec.ExitError); !ok || status.ExitCode() != 1 {
 			t.Fatalf("unexpected error: %+v", err)
 		}
