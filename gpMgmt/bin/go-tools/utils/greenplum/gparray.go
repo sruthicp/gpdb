@@ -26,7 +26,7 @@ type Segment struct {
 }
 
 func (seg *Segment) isSegmentPrimary() bool {
-	return seg.ContentId >= 0 && ((seg.Role == constants.ROLE_PRIMARY) || (seg.PrefRole == constants.ROLE_PRIMARY))
+	return seg.ContentId >= 0 && ((seg.Role == constants.RolePrimary) || (seg.PrefRole == constants.RolePrimary))
 }
 
 type GpArray struct {

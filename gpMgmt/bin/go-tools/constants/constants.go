@@ -15,6 +15,7 @@ const (
 	QeConnectFactor     = 3
 	DefaultBuffer       = "128000kB"
 	OsOpenFiles         = 65535
-	DefaultDB           = "template1"
-	ROLE_PRIMARY       = "p"
+	DefaultDbName       = "template1"
+	DefaultEncoding     = "UTF-8"
+	RolePrimary         = "p"
 )
