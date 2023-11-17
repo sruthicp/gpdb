@@ -121,7 +121,7 @@ func InitClusterServiceFn(hubConfig *hub.Config, inputConfigFile string, force b
 		return err
 	}
 
-	// TODO Make call to MakeCluster RPC and wait for results
+	// Make call to MakeCluster RPC and wait for results
 	client, err := ConnectToHub(Conf)
 	if err != nil {
 		return err
@@ -186,7 +186,7 @@ func LoadInputConfigToIdl(inputConfigFile string, force bool) (*idl.MakeClusterR
 	// Populate ClusterParams
 	clusterReq.ClusterParams = LoadClusterParams(&input)
 
-	// TODO : Get the forced flag
+	// Populate the forced flag
 	clusterReq.ForceFlag = force
 
 	return &clusterReq, nil

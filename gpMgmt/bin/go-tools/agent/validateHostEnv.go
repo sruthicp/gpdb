@@ -31,6 +31,15 @@ func (s *Server) ValidateHostEnvFn(dirList []string, forced bool) error {
 	if len(nonEmptyDirList) > 0 && !forced {
 		return fmt.Errorf("directory not empty:%v", nonEmptyDirList)
 	}
+	if forced && len(nonEmptyDirList) > 0 {
+		gplog.Debug("Forced init. Deleting non-empty directories:%s", dirList)
+		for _, dir := range dirList {
+			err := os.RemoveAll(dir)
+			if err != nil {
+				return fmt.Errorf("delete not empty dir:%s, error:%v", dir, err)
+			}
+		}
+	}
 
 	// Validate permission to initdb ? Error will be returned upon running
 	gplog.Debug("Checking initdb for permissions")
