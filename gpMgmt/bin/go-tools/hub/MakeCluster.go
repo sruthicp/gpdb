@@ -20,8 +20,7 @@ func (s *Server) MakeCluster(request *idl.MakeClusterRequest, stream idl.Hub_Mak
 	gplog.Debug("Starting MakeCluster")
 
 	streamLogMsg(stream, "Starting MakeCluster")
-
-	err := s.ValidateEnvironment(request)
+	err := s.NewValidateEnvironment(stream, request)
 	if err != nil {
 		gplog.Error("Error during validation:%v", err)
 		return err
@@ -97,13 +96,8 @@ func (s *Server) MakeCluster(request *idl.MakeClusterRequest, stream idl.Hub_Mak
 
 	return err
 }
-
-func (s *Server) ValidateEnvironment(request *idl.MakeClusterRequest) error {
-	// Check and validate environment for each segment
+func (s *Server) NewValidateEnvironment(stream idl.Hub_MakeClusterServer, request *idl.MakeClusterRequest) error {
 	gparray := request.GpArray
-	gplog.Info("Starting ValidateEnvironment")
-	// TODO Validate Parameters and gpArray populated
-
 	hostDirMap := make(map[string][]string)
 	// Add coordinator to the map
 	hostDirMap[gparray.Coordinator.HostAddress] = append(hostDirMap[gparray.Coordinator.HostAddress], gparray.Coordinator.DataDirectory)
@@ -112,57 +106,115 @@ func (s *Server) ValidateEnvironment(request *idl.MakeClusterRequest) error {
 	for _, seg := range gparray.Primaries {
 		hostDirMap[seg.HostAddress] = append(hostDirMap[seg.HostAddress], seg.DataDirectory)
 	}
+	progressLabel := "Validating segments:"
+	progressTotal := len(hostDirMap)
+	streamProgressMsg(stream, progressLabel, progressTotal)
+	validateFn := func(conn *Connection) error {
+		dirList := hostDirMap[conn.Hostname]
+		validateReq := idl.ValidateHostEnvRequest{DirectoryList: dirList, Forced: request.ForceFlag}
+		_, err := conn.AgentClient.ValidateHostEnv(context.Background(), &validateReq)
+		if err != nil {
+			return err
+		}
+		streamProgressMsg(stream, progressLabel, progressTotal)
+		return nil
+		/*var wg sync.WaitGroup
+		errs := make(chan error, len(hostDirMap))
+		for _, dirList := range hostDirMap {
+			wg.Add(1)
+			go func(dirList []string) {
+				defer wg.Done()
+				validateReq := idl.ValidateHostEnvRequest{DirectoryList: dirList, Forced: request.ForceFlag}
+				_, err := conn.AgentClient.ValidateHostEnv(context.Background(), &validateReq)
+				if err != nil {
+					errs <- utils.FormatGrpcError(err)
+				} else {
+					streamProgressMsg(stream, progressLabel, progressTotal)
+				}
+			}(dirList)
+		}
 
-	// Connect to all agents
-	err := s.DialAllAgents()
-	if err != nil {
-		gplog.Error("Error in DialAllAgents:%v", err)
-		return fmt.Errorf("error while connecting Agents:%v", err)
-	}
-	err = s.ValidateOnAllHost(hostDirMap, request.ForceFlag)
-	if err != nil {
+		wg.Wait()
+		close(errs)
+		var err error
+		for e := range errs {
+			err = errors.Join(err, e)
+		}
+
+
 		return err
-	}
-	gplog.Info("Done with ValidateEnvironment")
 
-	return nil
+		*/
+	}
+	return ExecuteRPC(s.Conns, validateFn)
 }
 
-func (s *Server) ValidateOnAllHost(hostDirMap map[string][]string, forced bool) error {
-	// Get ready to validate host env
-	gplog.Debug("Starting validation on all hosts")
-	ctx, cancelFunc := context.WithTimeout(context.Background(), DialTimeout)
-	defer cancelFunc()
+/*
+	func (s *Server) ValidateEnvironment(request *idl.MakeClusterRequest) error {
+		// Check and validate environment for each segment
+		gparray := request.GpArray
+		gplog.Info("Starting ValidateEnvironment")
+		// TODO Validate Parameters and gpArray populated
 
-	creds, err := s.Credentials.LoadClientCredentials()
-	if err != nil {
-		cancelFunc()
-		return err
+		hostDirMap := make(map[string][]string)
+		// Add coordinator to the map
+		hostDirMap[gparray.Coordinator.HostAddress] = append(hostDirMap[gparray.Coordinator.HostAddress], gparray.Coordinator.DataDirectory)
+
+		// Add primaries to the map
+		for _, seg := range gparray.Primaries {
+			hostDirMap[seg.HostAddress] = append(hostDirMap[seg.HostAddress], seg.DataDirectory)
+		}
+
+		// Connect to all agents
+		err := s.DialAllAgents()
+		if err != nil {
+			gplog.Error("Error in DialAllAgents:%v", err)
+			return fmt.Errorf("error while connecting Agents:%v", err)
+		}
+		err = s.ValidateOnAllHost(hostDirMap, request.ForceFlag)
+		if err != nil {
+			return err
+		}
+		gplog.Info("Done with ValidateEnvironment")
+
+		return nil
 	}
-	gplog.Debug("Done with initial gRPC setup")
-	var wg sync.WaitGroup
-	errs := make(chan error, len(hostDirMap))
-	for hostname, dirList := range hostDirMap {
-		wg.Add(1)
-		go func(hostname string) {
-			defer wg.Done()
-			err = s.ValidateOnHost(hostname, creds, ctx, dirList, forced)
-			errs <- err
-		}(hostname)
+
+	func (s *Server) ValidateOnAllHost(hostDirMap map[string][]string, forced bool) error {
+		// Get ready to validate host env
+		gplog.Debug("Starting validation on all hosts")
+		ctx, cancelFunc := context.WithTimeout(context.Background(), DialTimeout)
+		defer cancelFunc()
+
+		creds, err := s.Credentials.LoadClientCredentials()
 		if err != nil {
 			cancelFunc()
 			return err
 		}
+		gplog.Debug("Done with initial gRPC setup")
+		var wg sync.WaitGroup
+		errs := make(chan error, len(hostDirMap))
+		for hostname, dirList := range hostDirMap {
+			wg.Add(1)
+			go func(hostname string) {
+				defer wg.Done()
+				err = s.ValidateOnHost(hostname, creds, ctx, dirList, forced)
+				errs <- err
+			}(hostname)
+			if err != nil {
+				cancelFunc()
+				return err
+			}
+		}
+		wg.Wait()
+		close(errs)
+		var err1 error
+		for e := range errs {
+			err1 = errors.Join(err1, e)
+		}
+		return err1
 	}
-	wg.Wait()
-	close(errs)
-	var err1 error
-	for e := range errs {
-		err1 = errors.Join(err1, e)
-	}
-	return err1
-}
-
+*/
 func (s *Server) ValidateOnHost(hostname string, credentials credentials.TransportCredentials, ctx context.Context, dirList []string, forced bool) error {
 	address := fmt.Sprintf("%s:%d", hostname, s.AgentPort)
 	gplog.Debug("Calling RPC on:%s", address)
