@@ -4,75 +4,94 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
-	"github.com/greenplum-db/gpdb/gp/common"
 	"github.com/greenplum-db/gpdb/gp/constants"
 	"github.com/greenplum-db/gpdb/gp/hub"
 	"github.com/greenplum-db/gpdb/gp/idl"
 	"github.com/greenplum-db/gpdb/gp/utils"
 )
 
-var (
-	execCommand = exec.Command
-)
-
-type InputConfig struct {
-	ClusterName     string              `mapstructure:"cluster-name"`
-	DbName          string              `mapstructure:"db-name"`
-	Encoding        string              `mapstructure:"encoding"`
-	HbaHostnames    bool                `mapstructure:"hba-hostnames"`
-	SuPassword      string              `mapstructure:"su-password"`
-	Locale          common.Locale       `mapstructure:"locale"`
-	CommonConfig    map[string]string   `mapstructure:"common-config"`
-	CordConfig      map[string]string   `mapstructure:"coordinator-config"`
-	SegmentConfig   map[string]string   `mapstructure:"segment-config"`
-	Coordinator     map[string]string   `mapstructure:"coordinator"`
-	PrimarySegments []map[string]string `mapstructure:"primary-segments-array"`
+type Locale struct {
+	LcAll      string `mapstructure:"lc-all"`
+	LcCollate  string `mapstructure:"lc-collate"`
+	LcCtype    string `mapstructure:"lc-ctype"`
+	LcMessages string `mapstructure:"lc-messages"`
+	LcMonetary string `mapstructure:"lc-monetary"`
+	LcNumeric  string `mapstructure:"lc-numeric"`
+	LcTime     string `mapstructure:"lc-time"`
 }
 
-func SegmentToIdl(input map[string]string) *idl.Segment {
-	segment := idl.Segment{}
-	segment.HostName = input["hostname"]
-	segment.HostAddress = input["address"]
-	segment.DataDirectory = input["data-directory"]
-	port, _ := strconv.Atoi(input["port"])
-	segment.Port = int32(port)
-	return &segment
+type Segment struct {
+	Hostname      string `mapstructure:"hostname"`
+	Address       string `mapstructure:"address"`
+	Port          int    `mapstructure:"port"`
+	DataDirectory string `mapstructure:"data-directory"`
 }
 
-func LoadClusterParams(input *InputConfig) *idl.ClusterParams {
-	clusterParam := new(idl.ClusterParams)
-	// Populate ClusterParams
-	clusterParam.HbaHostnames = input.HbaHostnames
-	clusterParam.SuPassword = input.SuPassword
-	clusterParam.Encoding = input.Encoding
-
-	clusterParam.DbName = input.DbName
-	clusterParam.CommonConfig = input.CommonConfig
-	clusterParam.CoordinatorConfig = input.CordConfig
-	clusterParam.SegmentConfig = input.SegmentConfig
-
-	// Load Locale
-	clusterParam.Locale = LoadLocale(input.Locale)
-	return clusterParam
+type InitConfig struct {
+	ClusterName          string            `mapstructure:"cluster-name"`
+	DbName               string            `mapstructure:"db-name"`
+	Encoding             string            `mapstructure:"encoding"`
+	HbaHostnames         bool              `mapstructure:"hba-hostnames"`
+	SuPassword           string            `mapstructure:"su-password"`
+	Locale               Locale            `mapstructure:"locale"`
+	CommonConfig         map[string]string `mapstructure:"common-config"`
+	CoordinatorConfig    map[string]string `mapstructure:"coordinator-config"`
+	SegmentConfig        map[string]string `mapstructure:"segment-config"`
+	Coordinator          Segment           `mapstructure:"coordinator"`
+	PrimarySegmentsArray []Segment         `mapstructure:"primary-segments-array"`
 }
-func LoadLocale(param common.Locale) *idl.Locale {
-	locale := new(idl.Locale)
-	locale.LcCollate = param.Lc_collate
-	locale.LcAll = param.Lc_all
-	locale.LcCtype = param.Lc_ctype
-	locale.LcMessages = param.Lc_messages
-	locale.LcMonetory = param.Lc_monetory
-	locale.LcTime = param.Lc_time
-	locale.LcNumeric = param.Lc_numeric
-	return locale
+
+func SegmentToIdl(seg Segment) *idl.Segment {
+	return &idl.Segment{
+		Port:          int32(seg.Port),
+		DataDirectory: seg.DataDirectory,
+		HostName:      seg.Hostname,
+		HostAddress:   seg.Address,
+	}
+}
+
+func ClusterParamsToIdl(config *InitConfig) *idl.ClusterParams {
+	return &idl.ClusterParams{
+		CoordinatorConfig: config.CoordinatorConfig,
+		SegmentConfig:     config.SegmentConfig,
+		CommonConfig:      config.CommonConfig,
+		Locale: &idl.Locale{
+			LcAll:      config.Locale.LcAll,
+			LcCollate:  config.Locale.LcCollate,
+			LcCtype:    config.Locale.LcCtype,
+			LcMessages: config.Locale.LcMessages,
+			LcMonetory: config.Locale.LcMonetary,
+			LcNumeric:  config.Locale.LcNumeric,
+			LcTime:     config.Locale.LcTime,
+		},
+		HbaHostnames: config.HbaHostnames,
+		Encoding:     config.Encoding,
+		SuPassword:   config.SuPassword,
+		DbName:       config.DbName,
+	}
+}
+
+func CreateMakeClusterReq(config *InitConfig, forceFlag bool) *idl.MakeClusterRequest {
+	primarySegs := []*idl.Segment{}
+	for _, seg := range config.PrimarySegmentsArray {
+		primarySegs = append(primarySegs, SegmentToIdl(seg))
+	}
+
+	return &idl.MakeClusterRequest{
+		GpArray: &idl.GpArray{
+			Coordinator: SegmentToIdl(config.Coordinator),
+			Primaries:   primarySegs,
+		},
+		ClusterParams: ClusterParamsToIdl(config),
+		ForceFlag:     forceFlag,
+	}
 }
 
 func initCmd() *cobra.Command {
@@ -154,55 +173,25 @@ func RunInitClusterFn(cmd *cobra.Command, args []string, force bool) error {
 }
 
 func LoadInputConfigToIdl(inputConfigFile string, force bool) (*idl.MakeClusterRequest, error) {
-	viper.AddConfigPath(filepath.Dir(inputConfigFile))
-	viper.SetConfigName(filepath.Base(inputConfigFile))      // Register config file name (no extension)
-	viper.SetConfigType((filepath.Ext(inputConfigFile))[1:]) // Look for specific type
+	viper.SetConfigFile(inputConfigFile)
+	viper.SetConfigType("json")
+	viper.SetDefault("common-config", make(map[string]string))
+	viper.SetDefault("coordinator-config", make(map[string]string))
+	viper.SetDefault("segment-config", make(map[string]string))
+	
 	if err := viper.ReadInConfig(); err != nil {
-		fmt.Printf("Error reading config file: %s\n", err)
-	}
-	var input InputConfig
-
-	if err := viper.Unmarshal(&input); err != nil {
-		fmt.Printf("Error reading config file: %s\n", err)
-		return nil, err
+		return &idl.MakeClusterRequest{}, fmt.Errorf("reading config file: %w", err)
 	}
 
-	clusterReq := idl.MakeClusterRequest{}
-	clusterReq.GpArray = &idl.GpArray{}
-	clusterReq.ClusterParams = &idl.ClusterParams{}
-	clusterReq.ClusterParams.Locale = &idl.Locale{}
-	clusterReq.ClusterParams.CoordinatorConfig = make(map[string]string)
-	clusterReq.ClusterParams.SegmentConfig = make(map[string]string)
-	clusterReq.ClusterParams.CommonConfig = make(map[string]string)
-
-	//Populate GPArray
-	clusterReq.GpArray.Coordinator = SegmentToIdl(input.Coordinator)
-
-	for _, seg := range input.PrimarySegments {
-		newSeg := SegmentToIdl(seg)
-		clusterReq.GpArray.Primaries = append(clusterReq.GpArray.Primaries, newSeg)
+	var config InitConfig
+	if err := viper.Unmarshal(&config); err != nil {
+		return &idl.MakeClusterRequest{}, fmt.Errorf("reading config file: %w", err)
 	}
 
-	// Populate ClusterParams
-	clusterReq.ClusterParams = LoadClusterParams(&input)
-
-	// Populate the forced flag
-	clusterReq.ForceFlag = force
-
-	return &clusterReq, nil
+	return CreateMakeClusterReq(&config, force), nil
 }
 
 func validateInputConfigAndSetDefaults(request *idl.MakeClusterRequest) error {
-	if request.ClusterParams.CoordinatorConfig == nil {
-		request.ClusterParams.CoordinatorConfig = make(map[string]string)
-	}
-	if request.ClusterParams.SegmentConfig == nil {
-		request.ClusterParams.SegmentConfig = make(map[string]string)
-	}
-	if request.ClusterParams.CommonConfig == nil {
-		request.ClusterParams.CommonConfig = make(map[string]string)
-	}
-
 	/* TODO Check this checksum
 	if _, ok := inputClusterParams.CommonConfig["heap-checksum"]; !ok {
 		gplog.Info("Could not find HEAP_CHECKSUM in cluster config, defaulting to on.")
@@ -212,7 +201,7 @@ func validateInputConfigAndSetDefaults(request *idl.MakeClusterRequest) error {
 
 	// Check if length of Gparray.PimarySegments is 0
 	if len(request.GpArray.Primaries) == 0 {
-		gplog.Error("No primary segments are provided in input config file")
+		return fmt.Errorf("No primary segments are provided in input config file")
 	}
 
 	if request.ClusterParams.DbName == "" {
@@ -226,10 +215,10 @@ func validateInputConfigAndSetDefaults(request *idl.MakeClusterRequest) error {
 	}
 
 	if request.ClusterParams.Encoding == "SQL_ASCII" {
-		gplog.Error("SQL_ASCII is no longer supported as a server encoding")
+		return fmt.Errorf("SQL_ASCII is no longer supported as a server encoding")
 	}
 
-	if _, ok := request.ClusterParams.CoordinatorConfig["maxconnections"]; !ok {
+	if _, ok := request.ClusterParams.CoordinatorConfig["max_connections"]; !ok {
 		gplog.Info(fmt.Sprintf("COORDINATOR max_connections not set, will set to default value %v", constants.DefaultQdMaxConnect))
 		request.ClusterParams.CoordinatorConfig["max_connections"] = strconv.Itoa(constants.DefaultQdMaxConnect)
 	}
@@ -240,7 +229,7 @@ func validateInputConfigAndSetDefaults(request *idl.MakeClusterRequest) error {
 	}
 
 	if coordinatorMaxConnect < 1 {
-		gplog.Error("COORDINATOR_MAX_CONNECT less than 1")
+		return fmt.Errorf("COORDINATOR_MAX_CONNECT less than 1")
 	}
 	if _, ok := request.ClusterParams.SegmentConfig["max_connections"]; !ok {
 		request.ClusterParams.SegmentConfig["max_connections"] = strconv.Itoa(coordinatorMaxConnect * constants.QeConnectFactor)
@@ -253,13 +242,18 @@ func validateInputConfigAndSetDefaults(request *idl.MakeClusterRequest) error {
 	}
 
 	// check coordinator open file values
-	coordinatorOpenFileLimit, _ := execCommand("ulimit", "-n").CombinedOutput()
-	val, err := strconv.Atoi(string(coordinatorOpenFileLimit)[:len(string(coordinatorOpenFileLimit))-1])
+	out, err := utils.System.ExecCommand("ulimit", "-n").CombinedOutput()
 	if err != nil {
-		fmt.Printf("could not covert the ulimit %s", err)
+		return err
 	}
-	if val < constants.OsOpenFiles {
-		gplog.Warn(fmt.Sprintf("Coordinator open file limit is %d should be >= %d", val, constants.OsOpenFiles))
+
+	coordinatorOpenFileLimit, err := strconv.Atoi(strings.TrimSpace(string(out)))
+	if err != nil {
+		return fmt.Errorf("could not convert the ulimit value: %w", err)
+	}
+
+	if coordinatorOpenFileLimit < constants.OsOpenFiles {
+		gplog.Warn(fmt.Sprintf("Coordinator open file limit is %d should be >= %d", coordinatorOpenFileLimit, constants.OsOpenFiles))
 	}
 
 	return nil
