@@ -23,7 +23,7 @@ type Initdb struct {
 	LcTime         string
 	SharedBuffers  string
 	MaxConnections int
-	DataChecksums   bool
+	DataChecksums  bool
 }
 
 func (cmd *Initdb) BuildExecCommand(gphome string) *exec.Cmd {
@@ -52,7 +52,6 @@ type PgCtlStart struct {
 	NoWait  bool
 	Logfile string
 	Options string
-	Mode    string
 }
 
 func (cmd *PgCtlStart) BuildExecCommand(gphome string) *exec.Cmd {
@@ -65,6 +64,26 @@ func (cmd *PgCtlStart) BuildExecCommand(gphome string) *exec.Cmd {
 	args = utils.AppendIfNotEmpty(args, "--no-wait", cmd.NoWait)
 	args = utils.AppendIfNotEmpty(args, "--log", cmd.Logfile)
 	args = utils.AppendIfNotEmpty(args, "--options", cmd.Options)
+
+	return utils.System.ExecCommand(utility, args...)
+}
+
+type PgCtlStop struct {
+	PgData  string
+	Timeout int
+	Wait    bool
+	NoWait  bool
+	Mode    string
+}
+
+func (cmd *PgCtlStop) BuildExecCommand(gphome string) *exec.Cmd {
+	utility := utils.GetGphomeUtilityPath(gphome, pgCtlUtility)
+	args := []string{"stop"}
+
+	args = utils.AppendIfNotEmpty(args, "--pgdata", cmd.PgData)
+	args = utils.AppendIfNotEmpty(args, "--timeout", cmd.Timeout)
+	args = utils.AppendIfNotEmpty(args, "--wait", cmd.Wait)
+	args = utils.AppendIfNotEmpty(args, "--no-wait", cmd.NoWait)
 	args = utils.AppendIfNotEmpty(args, "--mode", cmd.Mode)
 
 	return utils.System.ExecCommand(utility, args...)

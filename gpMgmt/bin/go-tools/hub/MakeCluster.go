@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/greenplum-db/gp-common-go-libs/dbconn"
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/greenplum-db/gpdb/gp/idl"
 	"github.com/greenplum-db/gpdb/gp/utils"
 	"github.com/greenplum-db/gpdb/gp/utils/greenplum"
+	"github.com/greenplum-db/gpdb/gp/utils/postgres"
 	"golang.org/x/exp/maps"
 )
 
@@ -33,10 +35,9 @@ func (s *Server) MakeCluster(request *idl.MakeClusterRequest, stream idl.Hub_Mak
 	streamLogMsg(stream, "Starting to register primary segments with the coordinator")
 	conn, err := greenplum.ConnectDatabase(request.GpArray.Coordinator.HostName, int(request.GpArray.Coordinator.Port))
 	if err != nil {
-		return fmt.Errorf("error connecting to database : %v", err)
+		return fmt.Errorf("connecting to database: %w", err)
 	}
-	
-	defer conn.Close()
+
 	err = greenplum.RegisterCoordinator(request.GpArray.Coordinator, conn)
 	if err != nil {
 		return err
@@ -53,6 +54,7 @@ func (s *Server) MakeCluster(request *idl.MakeClusterRequest, stream idl.Hub_Mak
 	if err != nil {
 		return err
 	}
+	conn.Close()
 
 	primarySegs, err := gpArray.GetPrimarySegments()
 	if err != nil {
@@ -71,34 +73,56 @@ func (s *Server) MakeCluster(request *idl.MakeClusterRequest, stream idl.Hub_Mak
 	// err = StartSegments(s.Conns, primarySegs, "-c gp_role=utility")
 
 	streamLogMsg(stream, "Restarting the Greenplum cluster in production mode")
-	gpstopOptions := &greenplum.GpStop{
-		DataDirectory:   request.GpArray.Coordinator.DataDirectory,
-		CoordinatorOnly: true,
+	streamLogMsg(stream, "Shutting down coordinator segment")
+	pgCtlStopCmd := &postgres.PgCtlStop{
+		PgData: request.GpArray.Coordinator.DataDirectory,
 	}
-	cmd := utils.NewGpSourcedCommand(gpstopOptions, s.GpHome)
-	err = streamExecCommand(stream, cmd, s.GpHome)
+	out, err := utils.RunExecCommand(pgCtlStopCmd, s.GpHome)
 	if err != nil {
-		return fmt.Errorf("executing gpstop: %w", err)
+		return fmt.Errorf("executing pg_ctl stop: %s, %w", out, err)
 	}
+	streamLogMsg(stream, "Successfully shut down coordinator segment")
 
 	gpstartOptions := &greenplum.GpStart{
 		DataDirectory: request.GpArray.Coordinator.DataDirectory,
 	}
-	cmd = utils.NewGpSourcedCommand(gpstartOptions, s.GpHome)
+	cmd := utils.NewGpSourcedCommand(gpstartOptions, s.GpHome)
 	err = streamExecCommand(stream, cmd, s.GpHome)
 	if err != nil {
 		return fmt.Errorf("executing gpstart: %w", err)
 	}
 	streamLogMsg(stream, "Completed restart of Greenplum cluster in production mode")
 
-	// TODO
-	// 1. CREATE_GPEXTENSIONS
-	// 2. IMPORT_COLLATION
-	// 3. CREATE_DATABASE
-	// 4. SET_GP_USER_PW
+	streamLogMsg(stream, "Creating core GPDB extensions")
+	err = CreateGpToolkitExt(conn)
+	if err != nil {
+		return err
+	}
+	streamLogMsg(stream, "Successfully created core GPDB extensions")
 
-	return err
+	streamLogMsg(stream, "Importing system collations")
+	err = ImportCollation(conn)
+	if err != nil {
+		return err
+	}
+
+	if request.ClusterParams.DbName != "" {
+		streamLogMsg(stream, fmt.Sprintf("Creating database %q", request.ClusterParams.DbName))
+		err = CreateDatabase(conn, request.ClusterParams.DbName)
+		if err != nil {
+			return err
+		}
+	}
+
+	streamLogMsg(stream, "Setting Greenplum superuser password")
+	err = SetGpUserPasswd(conn, request.ClusterParams.SuPassword)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
+
 func (s *Server) ValidateEnvironment(stream idl.Hub_MakeClusterServer, request *idl.MakeClusterRequest) error {
 	gparray := request.GpArray
 	hostDirMap := make(map[string][]string)
@@ -276,4 +300,84 @@ func StartSegments(conns []*Connection, segs []greenplum.Segment, options string
 	}
 
 	return ExecuteRPC(conns, request)
+}
+
+func execOnDatabase(conn *dbconn.DBConn, dbname string, query string) error {
+	conn.DBName = dbname
+	if err := conn.Connect(1); err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	if _, err := conn.Exec(query); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func CreateGpToolkitExt(conn *dbconn.DBConn) error {
+	createExtensionQuery := "CREATE EXTENSION gp_toolkit"
+
+	for _, dbname := range []string{"template1", "postgres"} {
+		if err := execOnDatabase(conn, dbname, createExtensionQuery); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func ImportCollation(conn *dbconn.DBConn) error {
+	importCollationQuery := "SELECT pg_import_system_collations('pg_catalog'); ANALYZE;"
+
+	if err := execOnDatabase(conn, "postgres", "ALTER DATABASE template0 ALLOW_CONNECTIONS on"); err != nil {
+		return err
+	}
+
+	if err := execOnDatabase(conn, "template0", importCollationQuery); err != nil {
+		return err
+	}
+	if err := execOnDatabase(conn, "template0", "VACUUM FREEZE"); err != nil {
+		return err
+	}
+
+	if err := execOnDatabase(conn, "postgres", "ALTER DATABASE template0 ALLOW_CONNECTIONS off"); err != nil {
+		return err
+	}
+
+	for _, dbname := range []string{"template1", "postgres"} {
+		if err := execOnDatabase(conn, dbname, importCollationQuery); err != nil {
+			return err
+		}
+
+		if err := execOnDatabase(conn, dbname, "VACUUM FREEZE"); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func CreateDatabase(conn *dbconn.DBConn, dbname string) error {
+	createDbQuery := fmt.Sprintf("CREATE DATABASE %s", dbname)
+	if err := execOnDatabase(conn, "template1", createDbQuery); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func SetGpUserPasswd(conn *dbconn.DBConn, passwd string) error {
+	user, err := utils.System.CurrentUser()
+	if err != nil {
+		return err
+	}
+
+	alterPasswdQuery := fmt.Sprintf("ALTER USER %s WITH PASSWORD '%s'", user.Username, passwd)
+	if err := execOnDatabase(conn, "template1", alterPasswdQuery); err != nil {
+		return err
+	}
+
+	return nil
 }

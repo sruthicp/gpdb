@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/greenplum-db/gp-common-go-libs/testhelper"
+	"github.com/greenplum-db/gpdb/gp/testutils"
 	"github.com/greenplum-db/gpdb/gp/utils"
 	"github.com/greenplum-db/gpdb/gp/utils/postgres"
 )
@@ -105,7 +106,7 @@ guc_2 value_2`,
 
 	for _, tc := range cases {
 		t.Run("correctly updates the postgresql.conf file", func(t *testing.T) {
-			dname, confPath := CreateTempConfFile(t, "postgresql.conf", tc.confContent)
+			dname, confPath := createTempConfFile(t, "postgresql.conf", tc.confContent)
 			defer os.RemoveAll(dname)
 
 			err := postgres.UpdatePostgresqlConf(dname, tc.configParams, tc.overwrite)
@@ -113,19 +114,12 @@ guc_2 value_2`,
 				t.Fatalf("unexpected error: %#v", err)
 			}
 
-			result, err := os.ReadFile(confPath)
-			if err != nil {
-				t.Fatalf("unexpected error: %#v", err)
-			}
-
-			if tc.expected != string(result) {
-				t.Fatalf("got %s, want %s", result, tc.expected)
-			}
+			testutils.AssertFileContents(t, confPath, tc.expected)
 		})
 	}
 
 	t.Run("errors out when there is no file present", func(t *testing.T) {
-		dname, _ := CreateTempConfFile(t, "", "")
+		dname, _ := createTempConfFile(t, "", "")
 		defer os.RemoveAll(dname)
 
 		expectedErr := os.ErrNotExist
@@ -136,7 +130,7 @@ guc_2 value_2`,
 	})
 
 	t.Run("returns appropriate error when fails to update the conf file", func(t *testing.T) {
-		dname, _ := CreateTempConfFile(t, "postgresql.conf", "")
+		dname, _ := createTempConfFile(t, "postgresql.conf", "")
 		defer os.RemoveAll(dname)
 
 		expectedErr := errors.New("error")
@@ -156,24 +150,22 @@ func TestCreatePostgresInternalConf(t *testing.T) {
 	testhelper.SetupTestLogger()
 
 	t.Run("successfully creates the internal.auto.conf", func(t *testing.T) {
-		dname, _ := CreateTempConfFile(t, "", "")
+		dname, _ := createTempConfFile(t, "", "")
 		defer os.RemoveAll(dname)
 
-		err := postgres.CreatePostgresInternalConf(dname, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %#v", err)
+		confPath := filepath.Join(dname, "internal.auto.conf")
+		_, err := os.Stat(confPath)
+		if !os.IsNotExist(err) {
+			t.Fatalf("expected %s to not exist", confPath)
 		}
 
-		confPath := filepath.Join(dname, "internal.auto.conf")
-		result, err := os.ReadFile(confPath)
+		err = postgres.CreatePostgresInternalConf(dname, -1)
 		if err != nil {
 			t.Fatalf("unexpected error: %#v", err)
 		}
 
 		expected := "gp_dbid = -1"
-		if string(result) != expected {
-			t.Fatalf("got %s, want %s", result, expected)
-		}
+		testutils.AssertFileContents(t, confPath, expected)
 	})
 }
 
@@ -181,10 +173,10 @@ func TestBuildPgHbaConf(t *testing.T) {
 	testhelper.SetupTestLogger()
 
 	cases := []struct {
-		hbaHostnames   bool
-		hostname       string
-		confContent    string
-		expected       string
+		hbaHostnames bool
+		hostname     string
+		confContent  string
+		expected     string
 	}{
 		{
 			hbaHostnames: false,
@@ -227,7 +219,7 @@ host	replication	gpadmin	cdw	trust`,
 
 	for _, tc := range cases {
 		t.Run("correctly builds the coordinator pg_hba.conf file", func(t *testing.T) {
-			dname, confPath := CreateTempConfFile(t, "pg_hba.conf", tc.confContent)
+			dname, confPath := createTempConfFile(t, "pg_hba.conf", tc.confContent)
 			defer os.RemoveAll(dname)
 
 			utils.System.CurrentUser = func() (*user.User, error) {
@@ -245,19 +237,12 @@ host	replication	gpadmin	cdw	trust`,
 				t.Fatalf("unexpected error: %#v", err)
 			}
 
-			result, err := os.ReadFile(confPath)
-			if err != nil {
-				t.Fatalf("unexpected error: %#v", err)
-			}
-
-			if tc.expected != string(result) {
-				t.Fatalf("got %s, want %s", result, tc.expected)
-			}
+			testutils.AssertFileContents(t, confPath, tc.expected)
 		})
 	}
 }
 
-func CreateTempConfFile(t *testing.T, filename, content string) (string, string) {
+func createTempConfFile(t *testing.T, filename, content string) (string, string) {
 	t.Helper()
 
 	dname, err := os.MkdirTemp("", "gpseg")

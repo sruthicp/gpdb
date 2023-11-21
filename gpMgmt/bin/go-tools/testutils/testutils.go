@@ -106,12 +106,27 @@ func (s *MockCredentials) ResetCredsError() {
 }
 
 func AssertLogMessage(t *testing.T, buffer *gbytes.Buffer, message string) {
+	t.Helper()
+
 	pattern, err := regexp.Compile(message)
 	if err != nil {
 		t.Fatalf("unexpected error when compiling regex: %#v", err)
 	}
-	
+
 	if !pattern.MatchString(string(buffer.Contents())) {
 		t.Fatalf("expected pattern '%s' not found in log '%s'", message, buffer.Contents())
+	}
+}
+
+func AssertFileContents(t *testing.T, filepath string, expected string) {
+	t.Helper()
+
+	result, err := os.ReadFile(filepath)
+	if err != nil {
+		t.Fatalf("unexpected error: %#v", err)
+	}
+
+	if string(result) != expected {
+		t.Fatalf("got %s, want %s", result, expected)
 	}
 }

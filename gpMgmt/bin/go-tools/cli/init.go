@@ -178,7 +178,7 @@ func LoadInputConfigToIdl(inputConfigFile string, force bool) (*idl.MakeClusterR
 	viper.SetDefault("common-config", make(map[string]string))
 	viper.SetDefault("coordinator-config", make(map[string]string))
 	viper.SetDefault("segment-config", make(map[string]string))
-	
+
 	if err := viper.ReadInConfig(); err != nil {
 		return &idl.MakeClusterRequest{}, fmt.Errorf("reading config file: %w", err)
 	}
@@ -204,10 +204,12 @@ func validateInputConfigAndSetDefaults(request *idl.MakeClusterRequest) error {
 		return fmt.Errorf("No primary segments are provided in input config file")
 	}
 
-	if request.ClusterParams.DbName == "" {
-		gplog.Info(fmt.Sprintf("Database name is not set, will set to default %v", constants.DefaultDbName))
-		request.ClusterParams.DbName = constants.DefaultDbName
-	}
+	// TODO: Current gpinitsystem does not create a database if not provided by the user.
+	// To decide if we want the same behaviour
+	// if request.ClusterParams.DbName == "" {
+	// 	gplog.Info(fmt.Sprintf("Database name is not set, will set to default %v", constants.DefaultDbName))
+	// 	request.ClusterParams.DbName = constants.DefaultDbName
+	// }
 
 	if request.ClusterParams.Encoding == "" {
 		gplog.Info(fmt.Sprintf("Could not find encoding in cluster config, defaulting to %v", constants.DefaultEncoding))
