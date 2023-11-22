@@ -96,10 +96,12 @@ func CreateMakeClusterReq(config *InitConfig, forceFlag bool) *idl.MakeClusterRe
 
 func initCmd() *cobra.Command {
 	initCmd := &cobra.Command{
-		Use:   "init",
-		Short: "Initialize cluster, segments",
+		Use:     "init",
+		Short:   "Initialize cluster, segments",
+		PreRunE: InitializeCommand,
+		RunE:    RunInitClusterCmd,
 	}
-
+	initCmd.PersistentFlags().Bool("force", false, "Create cluster forcefully by overwriting existing directories")
 	initCmd.AddCommand(initClusterCmd())
 	return initCmd
 }
@@ -116,12 +118,11 @@ func initClusterCmd() *cobra.Command {
 		PreRunE: InitializeCommand,
 		RunE:    RunInitClusterCmd,
 	}
-	initClusterCmd.PersistentFlags().Bool("force", false, "Create cluster forcefully by overwriting existing directories")
 
 	return initClusterCmd
 }
 func RunInitClusterCmd(cmd *cobra.Command, args []string) error {
-	force, err := cmd.PersistentFlags().GetBool("force")
+	force, err := cmd.Flags().GetBool("force")
 	if err != nil {
 		gplog.Error("Could not get value of force flag %v", err)
 		return err
