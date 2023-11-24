@@ -12,13 +12,6 @@ import (
 	"github.com/greenplum-db/gpdb/gp/utils/postgres"
 )
 
-var (
-	UpdatePostgresqlConf       = postgres.UpdatePostgresqlConf
-	CreatePostgresInternalConf = postgres.CreatePostgresInternalConf
-	UpdateCoordinatorPgHbaConf = postgres.UpdateCoordinatorPgHbaConf
-	UpdateSegmentPgHbaConf     = postgres.UpdateSegmentPgHbaConf
-)
-
 func (s *Server) MakeSegment(ctx context.Context, in *idl.MakeSegmentRequest) (*idl.MakeSegmentReply, error) {
 	dataDirectory := in.Segment.DataDirectory
 	locale := in.Locale
@@ -48,20 +41,20 @@ func (s *Server) MakeSegment(ctx context.Context, in *idl.MakeSegmentRequest) (*
 		configParams["log_statement"] = "all"
 	}
 
-	err = UpdatePostgresqlConf(dataDirectory, configParams, false)
+	err = postgres.UpdatePostgresqlConf(dataDirectory, configParams, false)
 	if err != nil {
 		return &idl.MakeSegmentReply{}, fmt.Errorf("updating postgresql.conf: %w", err)
 	}
 
-	err = CreatePostgresInternalConf(dataDirectory, int(in.Segment.Dbid))
+	err = postgres.CreatePostgresInternalConf(dataDirectory, int(in.Segment.Dbid))
 	if err != nil {
 		return &idl.MakeSegmentReply{}, fmt.Errorf("creating internal.auto.conf: %w", err)
 	}
 
 	if in.Segment.Contentid == -1 {
-		err = UpdateCoordinatorPgHbaConf(dataDirectory, in.HbaHostNames, in.Segment.HostName)
+		err = postgres.UpdateCoordinatorPgHbaConf(dataDirectory, in.HbaHostNames, in.Segment.HostName)
 	} else {
-		err = UpdateSegmentPgHbaConf(dataDirectory, in.HbaHostNames, in.IPList, in.Segment.HostName)
+		err = postgres.UpdateSegmentPgHbaConf(dataDirectory, in.HbaHostNames, in.IPList, in.Segment.HostName)
 	}
 	if err != nil {
 		return &idl.MakeSegmentReply{}, fmt.Errorf("updating pg_hba.conf: %w", err)

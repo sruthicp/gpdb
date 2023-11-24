@@ -2,6 +2,7 @@ package postgres_test
 
 import (
 	"errors"
+	"io/fs"
 	"net"
 	"os"
 	"os/user"
@@ -106,7 +107,7 @@ guc_2 value_2`,
 
 	for _, tc := range cases {
 		t.Run("correctly updates the postgresql.conf file", func(t *testing.T) {
-			dname, confPath := createTempConfFile(t, "postgresql.conf", tc.confContent)
+			dname, confPath := createTempConfFile(t, "postgresql.conf", tc.confContent, 0644)
 			defer os.RemoveAll(dname)
 
 			err := postgres.UpdatePostgresqlConf(dname, tc.configParams, tc.overwrite)
@@ -119,7 +120,7 @@ guc_2 value_2`,
 	}
 
 	t.Run("errors out when there is no file present", func(t *testing.T) {
-		dname, _ := createTempConfFile(t, "", "")
+		dname, _ := createTempConfFile(t, "", "", 0644)
 		defer os.RemoveAll(dname)
 
 		expectedErr := os.ErrNotExist
@@ -130,7 +131,7 @@ guc_2 value_2`,
 	})
 
 	t.Run("returns appropriate error when fails to update the conf file", func(t *testing.T) {
-		dname, _ := createTempConfFile(t, "postgresql.conf", "")
+		dname, _ := createTempConfFile(t, "postgresql.conf", "", 0644)
 		defer os.RemoveAll(dname)
 
 		expectedErr := errors.New("error")
@@ -150,7 +151,7 @@ func TestCreatePostgresInternalConf(t *testing.T) {
 	testhelper.SetupTestLogger()
 
 	t.Run("successfully creates the internal.auto.conf", func(t *testing.T) {
-		dname, _ := createTempConfFile(t, "", "")
+		dname, _ := createTempConfFile(t, "", "", 0644)
 		defer os.RemoveAll(dname)
 
 		confPath := filepath.Join(dname, "internal.auto.conf")
@@ -167,31 +168,64 @@ func TestCreatePostgresInternalConf(t *testing.T) {
 		expected := "gp_dbid = -1"
 		testutils.AssertFileContents(t, confPath, expected)
 	})
+
+	t.Run("errors out when not able to create the file", func(t *testing.T) {
+		dname, _ := createTempConfFile(t, "internal.auto.conf", "", 0000)
+		defer os.RemoveAll(dname)
+
+		expectedErr := os.ErrPermission
+		err := postgres.CreatePostgresInternalConf(dname, -1)
+		if !errors.Is(err, expectedErr) {
+			t.Fatalf("got %#v, want %#v", err, expectedErr)
+		}
+	})
+
+	t.Run("errors out when not able to write to the file", func(t *testing.T) {
+		dname, _ := createTempConfFile(t, "", "", 0644)
+		defer os.RemoveAll(dname)
+
+		utils.System.Create = func(name string) (*os.File, error) {
+			_, writer, _ := os.Pipe()
+			writer.Close()
+
+			return writer, nil
+		}
+		defer utils.ResetSystemFunctions()
+
+		expectedErr := os.ErrClosed
+		err := postgres.CreatePostgresInternalConf(dname, -1)
+		if !errors.Is(err, expectedErr) {
+			t.Fatalf("got %#v, want %#v", err, expectedErr)
+		}
+	})
 }
 
 func TestBuildPgHbaConf(t *testing.T) {
 	testhelper.SetupTestLogger()
 
-	cases := []struct {
-		hbaHostnames bool
-		hostname     string
-		confContent  string
-		expected     string
+	coordinatorCases := []struct {
+		hbaHostnames     bool
+		coordinator      bool
+		coordinatorAddrs []string
+		confContent      string
+		expected         string
 	}{
 		{
 			hbaHostnames: false,
-			hostname:     "cdw",
+			coordinator:  true,
 			confContent:  ``,
 			expected: `local	all	gpadmin	ident
 host	all	gpadmin	localhost	trust
-host	all	gpadmin	1.2.3.4	trust
+host	all	gpadmin	192.0.1.0/24	trust
+host	all	gpadmin	2001:db8::/32	trust
 local	replication	gpadmin	ident
 host	replication	gpadmin	samehost	trust
-host	replication	gpadmin	1.2.3.4	trust`,
+host	replication	gpadmin	192.0.1.0/24	trust
+host	replication	gpadmin	2001:db8::/32	trust`,
 		},
 		{
 			hbaHostnames: true,
-			hostname:     "cdw",
+			coordinator:  true,
 			confContent:  ``,
 			expected: `local	all	gpadmin	ident
 host	all	gpadmin	localhost	trust
@@ -202,7 +236,7 @@ host	replication	gpadmin	cdw	trust`,
 		},
 		{
 			hbaHostnames: true,
-			hostname:     "cdw",
+			coordinator:  true,
 			confContent: `# foo
 foobar
 # bar`,
@@ -215,24 +249,63 @@ local	replication	gpadmin	ident
 host	replication	gpadmin	samehost	trust
 host	replication	gpadmin	cdw	trust`,
 		},
+		{
+			hbaHostnames:     false,
+			coordinator:      false,
+			coordinatorAddrs: []string{"192.0.0.0/24"},
+			confContent:      ``,
+			expected: `host	all	all	192.0.0.0/24	trust
+host	all	gpadmin	192.0.1.0/24	trust
+host	all	gpadmin	2001:db8::/32	trust`,
+		},
+		{
+			hbaHostnames:     true,
+			coordinator:      false,
+			coordinatorAddrs: []string{"cdw"},
+			confContent:      ``,
+			expected: `host	all	all	cdw	trust
+host	all	gpadmin	sdw	trust`,
+		},
+		{
+			hbaHostnames:     true,
+			coordinator:      false,
+			coordinatorAddrs: []string{"cdw"},
+			confContent: `# foo
+foobar
+# bar`,
+			expected: `# foo
+foobar
+# bar
+host	all	all	cdw	trust
+host	all	gpadmin	sdw	trust`,
+		},
 	}
 
-	for _, tc := range cases {
-		t.Run("correctly builds the coordinator pg_hba.conf file", func(t *testing.T) {
-			dname, confPath := createTempConfFile(t, "pg_hba.conf", tc.confContent)
+	for _, tc := range coordinatorCases {
+		t.Run("correctly builds the pg_hba.conf file", func(t *testing.T) {
+			dname, confPath := createTempConfFile(t, "pg_hba.conf", tc.confContent, 0644)
 			defer os.RemoveAll(dname)
 
 			utils.System.CurrentUser = func() (*user.User, error) {
 				return &user.User{Username: "gpadmin"}, nil
 			}
 			utils.System.InterfaceAddrs = func() ([]net.Addr, error) {
-				ip := net.IPv4(1, 2, 3, 4)
-				addr := &net.IPAddr{IP: ip}
-				return []net.Addr{addr}, nil
+				_, addr1, _ := net.ParseCIDR("192.0.1.0/24")
+				_, addr2, _ := net.ParseCIDR("2001:db8::/32")
+				_, loopbackAddrIp4, _ := net.ParseCIDR("127.0.0.1/8")
+				_, loopbackAddrIp6, _ := net.ParseCIDR("::1/128")
+
+				return []net.Addr{addr1, addr2, loopbackAddrIp4, loopbackAddrIp6}, nil
 			}
 			defer utils.ResetSystemFunctions()
 
-			err := postgres.UpdateCoordinatorPgHbaConf(dname, tc.hbaHostnames, tc.hostname)
+			var err error
+			if tc.coordinator {
+				err = postgres.UpdateCoordinatorPgHbaConf(dname, tc.hbaHostnames, "cdw")
+			} else {
+				err = postgres.UpdateSegmentPgHbaConf(dname, tc.hbaHostnames, tc.coordinatorAddrs, "sdw")
+			}
+
 			if err != nil {
 				t.Fatalf("unexpected error: %#v", err)
 			}
@@ -240,9 +313,105 @@ host	replication	gpadmin	cdw	trust`,
 			testutils.AssertFileContents(t, confPath, tc.expected)
 		})
 	}
+
+	failureCases := []struct {
+		coordinator bool
+	}{
+		{
+			coordinator: true,
+		},
+		{
+			coordinator: false,
+		},
+	}
+
+	for _, tc := range failureCases {
+		t.Run("errors out when there is no file present", func(t *testing.T) {
+			dname, _ := createTempConfFile(t, "", "", 0644)
+			defer os.RemoveAll(dname)
+
+			var err error
+			expectedErr := os.ErrNotExist
+			if tc.coordinator {
+				err = postgres.UpdateCoordinatorPgHbaConf(dname, false, "cdw")
+			} else {
+				err = postgres.UpdateSegmentPgHbaConf(dname, false, []string{}, "sdw")
+			}
+
+			if !errors.Is(err, expectedErr) {
+				t.Fatalf("got %#v, want %#v", err, expectedErr)
+			}
+		})
+
+		t.Run("errors out when not able to get the current user", func(t *testing.T) {
+			dname, _ := createTempConfFile(t, "pg_hba.conf", "", 0644)
+			defer os.RemoveAll(dname)
+
+			expectedErr := errors.New("error")
+			utils.System.CurrentUser = func() (*user.User, error) {
+				return nil, expectedErr
+			}
+			defer utils.ResetSystemFunctions()
+
+			var err error
+			if tc.coordinator {
+				err = postgres.UpdateCoordinatorPgHbaConf(dname, false, "cdw")
+			} else {
+				err = postgres.UpdateSegmentPgHbaConf(dname, false, []string{}, "sdw")
+			}
+
+			if !errors.Is(err, expectedErr) {
+				t.Fatalf("got %#v, want %#v", err, expectedErr)
+			}
+		})
+
+		t.Run("errors out when not able to get the host address", func(t *testing.T) {
+			dname, _ := createTempConfFile(t, "pg_hba.conf", "", 0644)
+			defer os.RemoveAll(dname)
+
+			expectedErr := errors.New("error")
+			utils.System.InterfaceAddrs = func() ([]net.Addr, error) {
+				return nil, expectedErr
+			}
+			defer utils.ResetSystemFunctions()
+
+			var err error
+			if tc.coordinator {
+				err = postgres.UpdateCoordinatorPgHbaConf(dname, false, "cdw")
+			} else {
+				err = postgres.UpdateSegmentPgHbaConf(dname, false, []string{}, "sdw")
+			}
+
+			if !errors.Is(err, expectedErr) {
+				t.Fatalf("got %#v, want %#v", err, expectedErr)
+			}
+		})
+
+		t.Run("errors out when fails to update the conf file", func(t *testing.T) {
+			dname, _ := createTempConfFile(t, "pg_hba.conf", "", 0644)
+			defer os.RemoveAll(dname)
+
+			expectedErr := errors.New("error")
+			utils.System.Create = func(name string) (*os.File, error) {
+				return nil, expectedErr
+			}
+			defer utils.ResetSystemFunctions()
+
+			var err error
+			if tc.coordinator {
+				err = postgres.UpdateCoordinatorPgHbaConf(dname, false, "cdw")
+			} else {
+				err = postgres.UpdateSegmentPgHbaConf(dname, false, []string{}, "sdw")
+			}
+
+			if !errors.Is(err, expectedErr) {
+				t.Fatalf("got %#v, want %#v", err, expectedErr)
+			}
+		})
+	}
 }
 
-func createTempConfFile(t *testing.T, filename, content string) (string, string) {
+func createTempConfFile(t *testing.T, filename, content string, perm fs.FileMode) (string, string) {
 	t.Helper()
 
 	dname, err := os.MkdirTemp("", "gpseg")
@@ -252,7 +421,10 @@ func createTempConfFile(t *testing.T, filename, content string) (string, string)
 
 	filepath := filepath.Join(dname, filename)
 	if filename != "" {
-		os.WriteFile(filepath, []byte(content), 0644)
+		err := os.WriteFile(filepath, []byte(content), perm)
+		if err != nil {
+			t.Fatalf("unexpected error: %#v", err)
+		}
 	}
 
 	return dname, filepath

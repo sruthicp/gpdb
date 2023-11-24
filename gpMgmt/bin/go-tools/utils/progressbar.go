@@ -1,8 +1,16 @@
 package utils
 
 import (
+	"fmt"
+
 	"github.com/vbauerster/mpb/v8"
 	"github.com/vbauerster/mpb/v8/decor"
+)
+
+const ( // ASCII color codes
+	red   = "\033[31m"
+	green = "\033[32m"
+	reset = "\033[0m"
 )
 
 func NewProgressInstance() *mpb.Progress {
@@ -17,11 +25,14 @@ func NewProgressBar(instance *mpb.Progress, label string, size int) *mpb.Bar {
 		mpb.PrependDecorators(
 			decor.Name(label, decor.WC{W: len(label) + 1, C: decor.DidentRight}),
 			decor.CountersNoUnit("%d/%d"),
-			decor.Elapsed(decor.ET_STYLE_GO, decor.WC{W: 4}),
+			decor.Elapsed(decor.ET_STYLE_GO, decor.WC{W: 6}),
 		),
 		mpb.AppendDecorators(
-			decor.OnComplete(
-				decor.Percentage(decor.WC{W: 4}), "done",
+			decor.OnAbort(
+				decor.OnComplete(
+					decor.Percentage(decor.WC{W: 4}), fmt.Sprintf("%sdone%s", green, reset),
+				),
+				fmt.Sprintf("%serror%s", red, reset),
 			),
 		),
 	)

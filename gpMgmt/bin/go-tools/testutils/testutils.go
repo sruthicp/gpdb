@@ -5,14 +5,18 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"reflect"
 	"regexp"
+	"sort"
+	"strings"
 	"testing"
+
+	"github.com/onsi/gomega/gbytes"
+	"google.golang.org/grpc/credentials"
 
 	"github.com/greenplum-db/gpdb/gp/constants"
 	"github.com/greenplum-db/gpdb/gp/hub"
 	"github.com/greenplum-db/gpdb/gp/idl"
-	"github.com/onsi/gomega/gbytes"
-	"google.golang.org/grpc/credentials"
 )
 
 type MockPlatform struct {
@@ -126,7 +130,26 @@ func AssertFileContents(t *testing.T, filepath string, expected string) {
 		t.Fatalf("unexpected error: %#v", err)
 	}
 
-	if string(result) != expected {
+	if strings.TrimSpace(string(result)) != strings.TrimSpace(expected) {
+		t.Fatalf("got %s, want %s", result, expected)
+	}
+}
+
+func AssertFileContentsUnordered(t *testing.T, filepath string, expected string) {
+	t.Helper()
+
+	result, err := os.ReadFile(filepath)
+	if err != nil {
+		t.Fatalf("unexpected error: %#v", err)
+	}
+	
+	lines := strings.Split(strings.TrimSpace(string(result)), "\n")
+	expectedLines := strings.Split(strings.TrimSpace(expected), "\n")
+	
+	sort.Strings(lines)
+	sort.Strings(expectedLines)
+
+	if !reflect.DeepEqual(lines, expectedLines) {
 		t.Fatalf("got %s, want %s", result, expected)
 	}
 }

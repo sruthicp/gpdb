@@ -56,7 +56,11 @@ func (gpArray *GpArray) ReadGpSegmentConfig(conn *dbconn.DBConn) error {
 
 	query := "select dbid, content, role, preferred_role, mode, status, port, datadir, hostname, address " +
 		"from pg_catalog.gp_segment_configuration  order by content asc, role desc;"
+
 	rows, err := conn.Query(query)
+	if err != nil {
+		return err
+	}
 	defer rows.Close()
 
 	result, err := buildGpArray(rows)

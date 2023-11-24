@@ -32,6 +32,7 @@ func (cmd *Initdb) BuildExecCommand(gphome string) *exec.Cmd {
 
 	args = utils.AppendIfNotEmpty(args, "--pgdata", cmd.PgData)
 	args = utils.AppendIfNotEmpty(args, "--encoding", cmd.Encoding)
+	args = utils.AppendIfNotEmpty(args, "--locale", cmd.Locale)
 	args = utils.AppendIfNotEmpty(args, "--lc-collate", cmd.LcCollate)
 	args = utils.AppendIfNotEmpty(args, "--lc-ctype", cmd.LcCtype)
 	args = utils.AppendIfNotEmpty(args, "--lc-messages", cmd.LcMessages)
