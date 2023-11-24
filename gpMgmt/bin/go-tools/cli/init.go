@@ -136,6 +136,9 @@ func InitClusterServiceFn(hubConfig *hub.Config, inputConfigFile string, force b
 	}
 
 	clusterReq, err := LoadInputConfigToIdl(inputConfigFile, force)
+	if err != nil {
+		return err
+	}
 
 	if err := validateInputConfigAndSetDefaults(clusterReq); err != nil {
 		return err
