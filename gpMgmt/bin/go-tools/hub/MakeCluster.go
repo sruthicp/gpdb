@@ -159,12 +159,13 @@ func CreateSingleSegment(conn *Connection, seg *idl.Segment, clusterParams *idl.
 	}
 
 	makeSegmentReq := &idl.MakeSegmentRequest{
-		Segment:      seg,
-		Locale:       clusterParams.Locale,
-		Encoding:     clusterParams.Encoding,
-		SegConfig:    pgConfig,
-		IPList:       addressList,
-		HbaHostNames: clusterParams.HbaHostnames,
+		Segment:       seg,
+		Locale:        clusterParams.Locale,
+		Encoding:      clusterParams.Encoding,
+		SegConfig:     pgConfig,
+		IPList:        addressList,
+		HbaHostNames:  clusterParams.HbaHostnames,
+		DataChecksums: clusterParams.DataChecksums,
 	}
 
 	_, err := conn.AgentClient.MakeSegment(context.Background(), makeSegmentReq)

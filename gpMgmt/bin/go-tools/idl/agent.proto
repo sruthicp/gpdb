@@ -48,6 +48,7 @@ message MakeSegmentRequest {
     map<string, string> SegConfig = 4;
     repeated string IPList = 5;
     bool hbaHostNames = 6;
+    bool dataChecksums = 7;
 }
 
 message MakeSegmentReply {

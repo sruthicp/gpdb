@@ -78,6 +78,7 @@ message ClusterParams{
     string encoding = 6;
     string suPassword = 7;
     string dbName = 8;
+    bool dataChecksums = 9;
 }
 
 message Locale {

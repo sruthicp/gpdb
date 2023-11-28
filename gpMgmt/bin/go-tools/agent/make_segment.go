@@ -25,7 +25,7 @@ func (s *Server) MakeSegment(ctx context.Context, in *idl.MakeSegmentRequest) (*
 		LcMonetory:    locale.LcMonetory,
 		LcNumeric:     locale.LcNumeric,
 		LcTime:        locale.LcTime,
-		DataChecksums: true,
+		DataChecksums: in.DataChecksums,
 	}
 	out, err := utils.RunExecCommand(&initdbOptions, s.GpHome)
 	if err != nil {

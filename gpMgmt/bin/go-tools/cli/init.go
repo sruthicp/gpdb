@@ -39,6 +39,7 @@ type InitConfig struct {
 	DbName               string            `mapstructure:"db-name"`
 	Encoding             string            `mapstructure:"encoding"`
 	HbaHostnames         bool              `mapstructure:"hba-hostnames"`
+	DataChecksums        bool              `mapstructure:"data-checksums"`
 	SuPassword           string            `mapstructure:"su-password"`
 	Locale               Locale            `mapstructure:"locale"`
 	CommonConfig         map[string]string `mapstructure:"common-config"`
@@ -71,10 +72,11 @@ func ClusterParamsToIdl(config *InitConfig) *idl.ClusterParams {
 			LcNumeric:  config.Locale.LcNumeric,
 			LcTime:     config.Locale.LcTime,
 		},
-		HbaHostnames: config.HbaHostnames,
-		Encoding:     config.Encoding,
-		SuPassword:   config.SuPassword,
-		DbName:       config.DbName,
+		HbaHostnames:  config.HbaHostnames,
+		Encoding:      config.Encoding,
+		SuPassword:    config.SuPassword,
+		DbName:        config.DbName,
+		DataChecksums: config.DataChecksums,
 	}
 }
 
@@ -196,13 +198,6 @@ func LoadInputConfigToIdl(inputConfigFile string, force bool) (*idl.MakeClusterR
 }
 
 func validateInputConfigAndSetDefaults(request *idl.MakeClusterRequest) error {
-	/* TODO Check this checksum
-	if _, ok := inputClusterParams.CommonConfig["heap-checksum"]; !ok {
-		gplog.Info("Could not find HEAP_CHECKSUM in cluster config, defaulting to on.")
-		inputClusterParams.CommonConfig["heap-checksum"] = "True"
-	}
-	*/
-
 	// Check if length of Gparray.PimarySegments is 0
 	if len(request.GpArray.Primaries) == 0 {
 		return fmt.Errorf("No primary segments are provided in input config file")
